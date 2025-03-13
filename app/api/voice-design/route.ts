@@ -37,16 +37,6 @@ function createVoiceDescription(profile: Profile): string {
   // Add time period/era context if available
   const era = profile.era ? ` from the ${profile.era} era` : '';
   
-  // Add birth/death years for historical context if available
-  let lifespan = '';
-  if (profile.birthYear) {
-    lifespan = ` (born ${profile.birthYear}`;
-    if (profile.deathYear) {
-      lifespan += `, died ${profile.deathYear}`;
-    }
-    lifespan += ')';
-  }
-  
   // Add specific voice characteristics if available
   const voiceQualities = profile.voiceCharacteristics ? 
     `The voice is ${profile.voiceCharacteristics}. ` : '';
@@ -57,7 +47,7 @@ function createVoiceDescription(profile: Profile): string {
     interpersonalStyle.toLowerCase() !== "insufficient data";
   
   // Build voice description focusing on qualities rather than identity
-  let description = `A ${voiceMaturity} ${gender === 'female' ? 'female' : gender === 'male' ? 'male' : 'gender-neutral'} ${nationality}voice${accent}${nativeLanguage}${era}${lifespan}. `;
+  let description = `A ${voiceMaturity} ${gender === 'female' ? 'female' : gender === 'male' ? 'male' : 'gender-neutral'} ${nationality}voice${accent}${nativeLanguage}${era}. `;
   
   // Add voice characteristics if available
   if (profile.voiceCharacteristics) {

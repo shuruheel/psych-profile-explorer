@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { MessageCircle, Loader2 } from "lucide-react"
 import { Profile } from "@/types/profile"
@@ -16,12 +16,22 @@ export function ProfileConversation({ profile }: ProfileConversationProps) {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [showLoadingSpinner, setShowLoadingSpinner] = useState(false)
   const { voiceStatus, voiceId, startVoiceGeneration, isGeneratingVoice } = useVoiceGeneration(profile)
+  const profileNameRef = useRef<string | null>(null)
   
-  // Start voice generation when profile is loaded
+  // Start voice generation when profile is loaded or changes
   useEffect(() => {
-    // If we don't have a voice and we're not already generating one, start generation
-    if (profile && voiceStatus === "idle") {
-      console.log(`Starting voice generation for ${profile.name} on profile load`);
+    // Skip on first render if profile is empty
+    if (!profile || !profile.name) return;
+    
+    // Check if profile has changed
+    const profileChanged = profileNameRef.current !== profile.name;
+    
+    // Update the ref
+    profileNameRef.current = profile.name;
+    
+    // If profile changed or voice status is idle, start generation
+    if (profileChanged || voiceStatus === "idle") {
+      console.log(`Starting voice generation for ${profile.name}${profileChanged ? ' (profile changed)' : ''}`);
       startVoiceGeneration();
     }
   }, [profile, voiceStatus, startVoiceGeneration]);

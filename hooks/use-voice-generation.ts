@@ -18,14 +18,33 @@ export function useVoiceGeneration(profile: Profile | null): UseVoiceGenerationR
   const [isGeneratingVoice, setIsGeneratingVoice] = useState(false)
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const errorCountRef = useRef<number>(0)
+  const currentProfileRef = useRef<string | null>(null)
 
   // Check localStorage for existing voice when profile changes
   useEffect(() => {
+    // If profile is null, reset everything
     if (!profile) {
       setVoiceStatus("idle")
       setVoiceId(null)
+      currentProfileRef.current = null
+      // Stop any existing polling
+      stopPolling()
       return
     }
+
+    // If this is a different profile from the one we were processing,
+    // stop any existing polling for the previous profile
+    if (currentProfileRef.current && currentProfileRef.current !== profile.name) {
+      console.log(`[useVoiceGeneration] Profile changed from ${currentProfileRef.current} to ${profile.name}, resetting voice generation`)
+      stopPolling()
+      setVoiceStatus("idle")
+      setVoiceId(null)
+      setIsGeneratingVoice(false)
+      // We'll update currentProfileRef below
+    }
+    
+    // Update current profile reference
+    currentProfileRef.current = profile.name
 
     // Check if we already have voice data in localStorage
     const voiceData = localStorage.getItem(`voice_${profile.name}`)
@@ -67,12 +86,26 @@ export function useVoiceGeneration(profile: Profile | null): UseVoiceGenerationR
     
     // Start a new polling interval
     pollIntervalRef.current = setInterval(() => {
-      checkVoiceStatus(name)
+      // Only check status if this is still the current profile
+      if (currentProfileRef.current === name) {
+        checkVoiceStatus(name)
+      } else {
+        // If profile has changed, stop polling
+        console.log(`[useVoiceGeneration] Profile changed while polling, stopping poll for ${name}`)
+        stopPolling()
+      }
     }, 3000)
   }
 
   // Check voice generation status
   const checkVoiceStatus = async (name: string) => {
+    // Ensure we're still working with the current profile
+    if (currentProfileRef.current !== name) {
+      console.log(`[useVoiceGeneration] Profile changed, stopping voice status check for ${name}`)
+      stopPolling()
+      return
+    }
+
     try {
       console.log(`[useVoiceGeneration] Checking voice status for ${name}...`)
       const response = await fetch(`/api/voice-status?name=${encodeURIComponent(name)}`)
@@ -97,6 +130,12 @@ export function useVoiceGeneration(profile: Profile | null): UseVoiceGenerationR
       
       const data = await response.json()
       console.log(`[useVoiceGeneration] Voice status response:`, data)
+      
+      // Ensure we're still working with the current profile
+      if (currentProfileRef.current !== name) {
+        console.log(`[useVoiceGeneration] Profile changed during status check, ignoring results for ${name}`)
+        return
+      }
       
       if (data.status === 'ready' && data.voiceId) {
         console.log(`[useVoiceGeneration] Voice is ready with ID: ${data.voiceId}`)
@@ -181,6 +220,12 @@ export function useVoiceGeneration(profile: Profile | null): UseVoiceGenerationR
       }
       
       const data = await response.json()
+      
+      // Ensure we're still working with the current profile
+      if (currentProfileRef.current !== profile.name) {
+        console.log(`[useVoiceGeneration] Profile changed during voice generation, ignoring results for ${profile.name}`)
+        return
+      }
       
       // If the voice was already cached on the server, update immediately
       if (data.cached && data.voiceId) {

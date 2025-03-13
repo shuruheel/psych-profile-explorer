@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
+// Import the shared voice cache
+import { voiceCache } from '../shared/voice-cache';
 
-// Local cache for storing voice IDs to avoid regeneration
-const voiceIdCache: Record<string, string> = {};
+// Mark this route as dynamic to avoid static generation errors
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
@@ -14,53 +16,60 @@ export async function POST(request: Request) {
       );
     }
     
-    // Get the voice ID - either from cache, through generation, or use default
+    // Get the voice ID - either from shared cache, through voice-design API, or use default
     let voiceId: string;
     
-    // Check if we have a cached voice ID for this name
-    if (voiceIdCache[name]) {
-      voiceId = voiceIdCache[name];
-    } 
-    // If profile is provided, try to generate a voice or get from profile.voiceId
-    else if (profile) {
-      if (profile.voiceId) {
-        voiceId = profile.voiceId;
-        voiceIdCache[name] = voiceId; // Cache it
-      } else {
-        // Call voice design API to generate a voice
-        try {
-          // Get base URL from environment or construct it
-          const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
-                         (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+    // Check if we have the voice in the shared cache first
+    if (name && voiceCache[name]) {
+      console.log(`[Text-to-Speech] Using cached voice ID for ${name}: ${voiceCache[name]}`);
+      voiceId = voiceCache[name];
+    }
+    // If profile has voiceId, use it
+    else if (profile && profile.voiceId) {
+      console.log(`[Text-to-Speech] Using profile voiceId: ${profile.voiceId}`);
+      voiceId = profile.voiceId;
+      
+      // Store in the shared cache for future use
+      if (name) {
+        voiceCache[name] = voiceId;
+      }
+    }
+    // If profile is provided but no voiceId, try to generate through voice-design API
+    else if (profile && profile.name) {
+      console.log(`[Text-to-Speech] No cached voice found for ${profile.name}, calling voice-design API...`);
+      
+      try {
+        const voiceResponse = await fetch('http://localhost:3000/api/voice-design', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ profile }),
+        });
+        
+        if (voiceResponse.ok) {
+          const voiceData = await voiceResponse.json();
+          voiceId = voiceData.voiceId;
+          console.log(`[Text-to-Speech] Voice designed successfully with ID: ${voiceId}`);
           
-          const voiceResponse = await fetch(new URL('/api/voice-design', 'http://localhost:3000').toString(), {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ profile }),
-          });
-          
-          if (voiceResponse.ok) {
-            const voiceData = await voiceResponse.json();
-            voiceId = voiceData.voiceId;
-            voiceIdCache[name] = voiceId; // Cache it
-          } else {
-            // Fallback to default
-            voiceId = process.env.DEFAULT_VOICE_ID || 'pNInz6obpgDQGcFmaJgB';
-          }
-        } catch (error) {
-          console.error('Error getting designed voice:', error);
+          // The voice-design API will have already added this to the shared cache
+        } else {
+          console.error(`[Text-to-Speech] Voice design API error: ${voiceResponse.status}`);
           voiceId = process.env.DEFAULT_VOICE_ID || 'pNInz6obpgDQGcFmaJgB';
         }
+      } catch (error) {
+        console.error('[Text-to-Speech] Error calling voice-design API:', error);
+        voiceId = process.env.DEFAULT_VOICE_ID || 'pNInz6obpgDQGcFmaJgB';
       }
-    } 
+    }
     // Otherwise use default voice
     else {
+      console.log(`[Text-to-Speech] Using default voice ID`);
       voiceId = process.env.DEFAULT_VOICE_ID || 'pNInz6obpgDQGcFmaJgB';
     }
     
     // Call Eleven Labs Text-to-Speech API
+    console.log(`[Text-to-Speech] Generating speech with voice ID: ${voiceId}`);
     const response = await fetch(
       `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
       {
@@ -82,7 +91,7 @@ export async function POST(request: Request) {
     
     if (!response.ok) {
       const errorData = await response.json();
-      console.error('Eleven Labs TTS API error:', errorData);
+      console.error('[Text-to-Speech] Eleven Labs TTS API error:', errorData);
       return NextResponse.json(
         { error: 'Failed to generate speech' },
         { status: 500 }
@@ -93,6 +102,8 @@ export async function POST(request: Request) {
     const audioArrayBuffer = await response.arrayBuffer();
     const audioBase64 = Buffer.from(audioArrayBuffer).toString('base64');
     
+    console.log(`[Text-to-Speech] Successfully generated speech for ${name || 'unknown'}`);
+    
     // Return the base64-encoded audio
     return NextResponse.json({
       audioUrl: `data:audio/mpeg;base64,${audioBase64}`,
@@ -100,7 +111,7 @@ export async function POST(request: Request) {
     });
     
   } catch (error) {
-    console.error('Error in text-to-speech endpoint:', error);
+    console.error('[Text-to-Speech] Error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

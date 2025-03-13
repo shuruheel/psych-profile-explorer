@@ -9,7 +9,7 @@ import { AlertCircle, Brain, Heart, Users, Lightbulb, TimerIcon as Timeline, Fil
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useClickOutside, useEscapeKey } from "@/lib/hooks"
-import { ConversationDialog } from "@/components/conversation-dialog"
+import { ProfileConversation } from "@/components/profile-conversation"
 import { Profile, PersonalityTrait, EmotionalTrigger, Loyalty, CoreValue, DevelopmentPeriod } from "@/types/profile"
 
 // Sample data - in a real app, this would come from an API
@@ -176,8 +176,7 @@ export default function ProfileViewer() {
   const [searchQuery, setSearchQuery] = useState('')
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState<number>(-1)
-  const [profileLoading, setProfileLoading] = useState(false)
-  const [conversationOpen, setConversationOpen] = useState(false)
+  const [profileDataLoading, setProfileDataLoading] = useState(false)
   
   // Filtered profile names based on search query
   const filteredProfileNames = profileNames.filter(profile => 
@@ -251,7 +250,7 @@ export default function ProfileViewer() {
     
     // If not found locally, fetch from API
     try {
-      setProfileLoading(true)
+      setProfileDataLoading(true)
       const response = await fetch(`/api/profiles/${encodeURIComponent(name)}`)
       
       if (!response.ok) {
@@ -267,7 +266,7 @@ export default function ProfileViewer() {
       console.error(`Error fetching profile ${name}:`, err)
       setError(`Failed to fetch profile: ${name}`)
     } finally {
-      setProfileLoading(false)
+      setProfileDataLoading(false)
     }
   }
 
@@ -547,27 +546,7 @@ export default function ProfileViewer() {
           
           <div className="flex items-center justify-between w-full mb-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 text-sm text-muted-foreground">
-            <Button 
-                onClick={() => {
-                  setConversationOpen(true);
-                  // Add a temporary loading message
-                  const loadingMessage = `I'm preparing my voice model to sound like ${selectedProfile?.name}. This may take a moment...`;
-                  if (selectedProfile) {
-                    // If there's no cache yet, show loading
-                    const firstTimeUser = localStorage.getItem(`voice_${selectedProfile.name}`) !== 'cached';
-                    if (firstTimeUser) {
-                      // Set localStorage flag for this profile
-                      localStorage.setItem(`voice_${selectedProfile.name}`, 'loading');
-                    }
-                  }
-                }} 
-                className="ml-auto gap-1.5"
-                variant="default"
-                style={{ backgroundColor: '#1a1a1a', color: 'white' }}
-              >
-                <MessageSquare className="h-4 w-4" />
-                <span>Talk to {selectedProfile?.name?.split(' ')[0]}</span>
-              </Button>
+              {selectedProfile && <ProfileConversation profile={selectedProfile} />}
               <div className="flex-1 flex items-center p-2 bg-background rounded-md border">
                 <span className="mr-2 font-medium whitespace-nowrap">Assesssment Confidence:</span>
                 <Progress 
@@ -606,6 +585,7 @@ export default function ProfileViewer() {
             </div>
           )}
 
+          
           <Tabs defaultValue="personality">
             <TabsList className="grid grid-cols-6 mb-3 md:gap-0 gap-1 w-full h-12">
               <TabsTrigger value="personality" className="flex items-center gap-1 h-10">
@@ -980,7 +960,7 @@ export default function ProfileViewer() {
         </CardContent>
       </Card>
 
-      {profileLoading && (
+      {profileDataLoading && (
         <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10">
           <div className="flex flex-col items-center">
             <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin mb-2"></div>
@@ -988,12 +968,6 @@ export default function ProfileViewer() {
           </div>
         </div>
       )}
-      
-      <ConversationDialog 
-        open={conversationOpen} 
-        onOpenChange={setConversationOpen} 
-        profile={selectedProfile} 
-      />
     </div>
   )
 }

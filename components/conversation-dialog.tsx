@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Mic, Send, Pause, Play, Volume2, VolumeX, Loader2 } from "lucide-react"
 import { Profile } from "@/types/profile"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { VoiceLoadingSpinner } from "@/components/voice-loading-spinner"
 
 interface Message {
   role: "user" | "assistant"
@@ -20,9 +21,15 @@ interface ConversationDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   profile: Profile | null
+  voiceId: string | null
 }
 
-export function ConversationDialog({ open, onOpenChange, profile }: ConversationDialogProps) {
+export function ConversationDialog({ 
+  open, 
+  onOpenChange, 
+  profile,
+  voiceId 
+}: ConversationDialogProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -30,48 +37,40 @@ export function ConversationDialog({ open, onOpenChange, profile }: Conversation
   const [isPlaying, setIsPlaying] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
   const [selectedModel, setSelectedModel] = useState("openai")
-  const [isVoiceLoading, setIsVoiceLoading] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const profileRef = useRef<Profile | null>(null)
   
-  // Create a welcome message when dialog opens
+  // Initialize conversation with welcome message when dialog opens
   useEffect(() => {
-    if (open && profile && messages.length === 0) {
-      // Check if this is the first time loading this profile
-      const isFirstTime = localStorage.getItem(`voice_${profile.name}`) === 'loading';
+    if (open && profile && messages.length === 0 && voiceId) {
+      // Create welcome message
+      const welcomeMessage: Message = { 
+        role: "assistant", 
+        content: `Hello, I am ${profile.name}. What would you like to discuss?` 
+      };
       
-      if (isFirstTime) {
-        setIsVoiceLoading(true);
-        setMessages([
-          { 
-            role: "assistant", 
-            content: `I'm preparing my voice model to sound like ${profile.name}. This may take a moment...` 
-          }
-        ]);
-        
-        // Call the voice design API to generate the voice
-        generateVoiceDesign(profile);
-        
-        // Start polling for voice status
-        const pollInterval = setInterval(() => {
-          checkVoiceStatus(profile.name);
-        }, 3000); // Check every 3 seconds
-        
-        // Clear interval when component unmounts or dialog closes
-        return () => clearInterval(pollInterval);
-      } else {
-        setMessages([
-          { 
-            role: "assistant", 
-            content: `Hello, I am ${profile.name}. What would you like to discuss?` 
-          }
-        ]);
-        
-        // Generate audio for the welcome message
-        generateSpeech(`Hello, I am ${profile.name}. What would you like to discuss?`, profile.name);
-      }
+      setMessages([welcomeMessage]);
+      
+      // Generate speech for welcome message
+      generateSpeech(`Hello, I am ${profile.name}. What would you like to discuss?`, profile.name);
     }
-  }, [open, profile, messages.length])
+  }, [open, profile, messages.length, voiceId])
+  
+  // Clear conversation when profile changes
+  useEffect(() => {
+    // Skip on initial render or if no profile is selected
+    if (!profile) return;
+    
+    if (profileRef.current && profileRef.current.name !== profile.name) {
+      console.log(`Profile changed from ${profileRef.current.name} to ${profile.name}, clearing conversation`);
+      // Clear messages to trigger the welcome message flow
+      setMessages([]);
+    }
+    
+    // Update the reference
+    profileRef.current = profile;
+  }, [profile]);
   
   // Scroll to bottom when messages update
   useEffect(() => {
@@ -98,7 +97,10 @@ export function ConversationDialog({ open, onOpenChange, profile }: Conversation
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          profile,
+          profile: {
+            ...profile,
+            voiceId // Add voiceId to profile
+          },
           userMessage,
           messageHistory: messages.map(m => ({ role: m.role, content: m.content })),
           model: selectedModel
@@ -121,13 +123,6 @@ export function ConversationDialog({ open, onOpenChange, profile }: Conversation
         }
       ])
       
-      // If we were in voice loading state, we're done now
-      if (isVoiceLoading) {
-        setIsVoiceLoading(false);
-        // Update localStorage to indicate this profile's voice is now cached
-        localStorage.setItem(`voice_${profile.name}`, 'cached');
-      }
-      
       // Play audio if available and not muted
       if (data.audioUrl && !isMuted) {
         audioRef.current = new Audio(data.audioUrl)
@@ -144,11 +139,6 @@ export function ConversationDialog({ open, onOpenChange, profile }: Conversation
           content: "I apologize, but I'm having trouble responding right now. Please try again later."
         }
       ])
-      
-      // Clear voice loading state if there was an error
-      if (isVoiceLoading) {
-        setIsVoiceLoading(false);
-      }
     } finally {
       setIsLoading(false)
     }
@@ -156,78 +146,61 @@ export function ConversationDialog({ open, onOpenChange, profile }: Conversation
   
   // Generate speech for existing messages
   const generateSpeech = async (text: string, name: string) => {
+    if (!voiceId) {
+      console.warn("No voice ID available for speech generation");
+      return;
+    }
+    
     try {
+      // Prepare request body with voice ID
+      const requestBody = {
+        text,
+        name,
+        profile: profile ? {
+          ...profile,
+          voiceId
+        } : undefined
+      };
+
       const response = await fetch("/api/text-to-speech", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          text,
-          name,
-          profile
-        }),
-      })
+        body: JSON.stringify(requestBody),
+      });
       
       if (!response.ok) {
-        throw new Error("Failed to generate speech")
+        throw new Error("Failed to generate speech");
       }
       
-      const data = await response.json()
+      const data = await response.json();
       
-      // If we were in voice loading state, we're done now
-      if (isVoiceLoading) {
-        setIsVoiceLoading(false)
-        // Update localStorage to indicate this profile's voice is now cached
-        if (profile) {
-          localStorage.setItem(`voice_${profile.name}`, 'cached')
-          
-          // Update the first message to the actual greeting
-          setMessages([{ 
-            role: "assistant", 
-            content: `Hello, I am ${profile.name}. What would you like to discuss?`,
+      // Update the last message with the audio URL
+      setMessages((prev) => {
+        const lastIndex = prev.length - 1;
+        if (lastIndex >= 0 && prev[lastIndex].role === "assistant") {
+          const updatedMessages = [...prev];
+          updatedMessages[lastIndex] = {
+            ...updatedMessages[lastIndex],
             audioUrl: data.audioUrl
-          }])
+          };
+          return updatedMessages;
         }
-      } else {
-        // Normal flow - update the last message with the audio URL
-        setMessages((prev) => {
-          const lastIndex = prev.length - 1
-          if (lastIndex >= 0 && prev[lastIndex].role === "assistant") {
-            const updatedMessages = [...prev]
-            updatedMessages[lastIndex] = {
-              ...updatedMessages[lastIndex],
-              audioUrl: data.audioUrl
-            }
-            return updatedMessages
-          }
-          return prev
-        })
-      }
+        return prev;
+      });
       
       // Play audio if not muted
       if (data.audioUrl && !isMuted) {
-        audioRef.current = new Audio(data.audioUrl)
-        audioRef.current.onended = () => setIsPlaying(false)
-        audioRef.current.play()
-        setIsPlaying(true)
+        audioRef.current = new Audio(data.audioUrl);
+        audioRef.current.onended = () => setIsPlaying(false);
+        audioRef.current.play();
+        setIsPlaying(true);
       }
     } catch (error) {
-      console.error("Error generating speech:", error)
-      
-      // Clear voice loading state if there was an error
-      if (isVoiceLoading) {
-        setIsVoiceLoading(false)
-        // Fall back to text-only message
-        if (profile) {
-          setMessages([{ 
-            role: "assistant", 
-            content: `Hello, I am ${profile.name}. What would you like to discuss?`
-          }])
-        }
-      }
+      console.error("Error generating speech:", error);
     }
-  }
+  };
   
   // Function to handle model change
   const handleModelChange = (value: string) => {
@@ -270,79 +243,24 @@ export function ConversationDialog({ open, onOpenChange, profile }: Conversation
   
   // Clear conversation
   const clearConversation = () => {
-    setMessages([])
-    if (profile) {
-      setMessages([
-        { 
-          role: "assistant", 
-          content: `Hello, I am ${profile.name}. What would you like to discuss?` 
-        }
-      ])
-      
-      generateSpeech(`Hello, I am ${profile.name}. What would you like to discuss?`, profile.name)
+    if (!profile) return;
+    
+    // Clear existing messages
+    setMessages([]);
+    
+    // Create new welcome message with proper typing
+    const welcomeMessage: Message = { 
+      role: "assistant", 
+      content: `Hello, I am ${profile.name}. What would you like to discuss?` 
+    };
+    
+    setMessages([welcomeMessage]);
+    
+    // Generate speech for welcome message using existing voice ID
+    if (voiceId) {
+      generateSpeech(`Hello, I am ${profile.name}. What would you like to discuss?`, profile.name);
     }
   }
-  
-  // Generate voice design for a new profile
-  const generateVoiceDesign = async (profile: Profile) => {
-    try {
-      console.log(`Generating voice design for ${profile.name}...`);
-      
-      const response = await fetch("/api/voice-design", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ profile }),
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to generate voice design: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      console.log(`Voice design generated successfully with ID: ${data.voiceId}`);
-      
-      // Once voice is designed, generate the welcome speech
-      generateSpeech(`Hello, I am ${profile.name}. What would you like to discuss?`, profile.name);
-      
-    } catch (error) {
-      console.error("Error generating voice design:", error);
-      setIsVoiceLoading(false);
-      
-      // Fall back to text-only message
-      setMessages([{ 
-        role: "assistant", 
-        content: `Hello, I am ${profile.name}. What would you like to discuss?`
-      }]);
-    }
-  };
-  
-  // Check if voice generation is complete
-  const checkVoiceStatus = async (name: string) => {
-    try {
-      const response = await fetch(`/api/voice-status?name=${encodeURIComponent(name)}`);
-      
-      if (!response.ok) {
-        console.error("Error checking voice status:", response.statusText);
-        return;
-      }
-      
-      const data = await response.json();
-      
-      if (data.status === 'ready' && isVoiceLoading) {
-        console.log(`Voice for ${name} is ready with ID: ${data.voiceId}`);
-        
-        // Voice is ready, update UI and generate welcome message
-        generateSpeech(`Hello, I am ${name}. What would you like to discuss?`, name);
-        
-        // Update local storage to indicate voice is cached
-        localStorage.setItem(`voice_${name}`, 'cached');
-      }
-    } catch (error) {
-      console.error("Error checking voice status:", error);
-    }
-  };
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

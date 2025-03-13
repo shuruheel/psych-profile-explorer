@@ -10,24 +10,14 @@ function createVoiceDescription(profile: Profile): string {
   // Extract key traits that would affect voice characteristics
   const gender = profile.gender?.toLowerCase() || 'neutral';
   
-  const emotionalTone = profile.emotionalProfile?.emotionalDisposition || 
-    profile.emotionalDisposition || 'neutral';
+  // Get emotional disposition with check for "insufficient data"
+  const emotionalDisposition = profile.emotionalProfile?.emotionalDisposition || 
+    profile.emotionalDisposition;
   
-  // Convert personality traits to voice qualities
-  const voiceQualities = profile.personalityTraits && profile.personalityTraits.length > 0
-    ? profile.personalityTraits
-        .map(trait => {
-          // Map personality traits to voice characteristics
-          switch(trait.trait.toLowerCase()) {
-            case 'confident': return 'strong and clear';
-            case 'gentle': return 'soft and warm';
-            case 'analytical': return 'precise and measured';
-            case 'energetic': return 'dynamic and expressive';
-            default: return 'balanced';
-          }
-        })
-        .join(', ')
-    : 'balanced, natural';
+  const hasEmotionalData = emotionalDisposition && 
+    emotionalDisposition.toLowerCase() !== "insufficient data";
+  
+  const emotionalTone = hasEmotionalData ? emotionalDisposition.toLowerCase() : null;
   
   // Age mapped to voice maturity
   let voiceMaturity = 'mature';
@@ -39,13 +29,32 @@ function createVoiceDescription(profile: Profile): string {
 
   // Add nationality and accent if available
   const nationality = profile.nationality ? `${profile.nationality} ` : '';
-  const accent = profile.accent ? ` with a ${profile.accent} accent` : '';
+  const accent = profile.accent ? ` with a ${profile.accent} (accent)` : '';
   
-  // Create voice description focusing on qualities rather than identity
-  return `A ${voiceMaturity} ${gender === 'female' ? 'female' : gender === 'male' ? 'male' : 'gender-neutral'} ${nationality}voice${accent} with ${voiceQualities} qualities. 
-  The voice has a ${emotionalTone.toLowerCase()} emotional tone and speaks in a 
-  ${profile.relationalDynamics?.interpersonalStyle || 'natural'} manner. 
-  The speaking style is ${profile.cognitiveStyle?.decisionMaking || 'balanced'} and thoughtful.`;
+  // Check if interpersonal style has valid data
+  const interpersonalStyle = profile.relationalDynamics?.interpersonalStyle;
+  const hasInterpersonalData = interpersonalStyle && 
+    interpersonalStyle.toLowerCase() !== "insufficient data";
+  
+  // Build voice description focusing on qualities rather than identity
+  let description = `A ${voiceMaturity} ${gender === 'female' ? 'female' : gender === 'male' ? 'male' : 'gender-neutral'} ${nationality}voice${accent}. `;
+  
+  // Add emotional tone only if data is available
+  if (hasEmotionalData) {
+    description += `The voice has a ${emotionalTone} emotional tone. `;
+  }
+  
+  // Add interpersonal style only if data is available
+  if (hasInterpersonalData) {
+    description += `The speaker speaks in a ${interpersonalStyle} manner. `;
+  }
+  
+  // Add personality traits if available
+  if (profile.personalityTraits?.length) {
+    description += `The speaker has the following personality traits: ${profile.personalityTraits.map(trait => trait.trait).join(', ')}.`;
+  }
+  
+  return description;
 }
 
 // Generate example text using quotes from profile evidence
@@ -248,27 +257,26 @@ export async function POST(request: Request) {
       console.error(`[Voice Design API] Failed to save voice (${saveResponse.status}):`, saveErrorText);
       // We still return the generated_voice_id even if saving fails
       // as it can be used temporarily
+      
+      // Store in our cache - even temp ID can be used until it expires
       voiceCache[profile.name] = generatedVoiceId;
       
       return NextResponse.json({
         voiceId: generatedVoiceId,
-        generated: true,
-        warning: `Voice generated but not saved permanently: ${saveResponse.status}`
+        temporary: true
       });
     }
     
-    const savedVoiceData = await saveResponse.json();
-    const permanentVoiceId = savedVoiceData.voice_id;
+    // Parse the response to get the permanent voice ID
+    const saveData = await saveResponse.json();
+    const permanentVoiceId = saveData.voice_id;
     
-    // Store in cache
+    // Store the permanent voice ID in our cache
     voiceCache[profile.name] = permanentVoiceId;
-    
     console.log(`[Voice Design API] Voice successfully generated and saved for ${profile.name} with ID: ${permanentVoiceId}`);
+    
     return NextResponse.json({
-      voiceId: permanentVoiceId,
-      generated: true,
-      saved: true,
-      enrichedProfile: enrichedProfile
+      voiceId: permanentVoiceId
     });
     
   } catch (error) {

@@ -92,6 +92,113 @@ export async function POST(request: Request) {
     if (!response.ok) {
       const errorData = await response.json();
       console.error('[Text-to-Speech] Eleven Labs TTS API error:', errorData);
+      
+      // Check for voice_not_found error specifically
+      if (errorData.detail?.status === 'voice_not_found' && name) {
+        console.log(`[Text-to-Speech] Voice ID ${voiceId} not found. Removing from cache.`);
+        
+        // Remove the invalid voice ID from cache
+        delete voiceCache[name];
+        
+        // If we have a profile, attempt to regenerate the voice
+        if (profile && profile.name) {
+          console.log(`[Text-to-Speech] Attempting to regenerate voice for ${profile.name}`);
+          
+          try {
+            const regenerateResponse = await fetch('http://localhost:3000/api/voice-design', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ profile }),
+            });
+            
+            if (regenerateResponse.ok) {
+              const regeneratedData = await regenerateResponse.json();
+              const regeneratedVoiceId = regeneratedData.voiceId;
+              console.log(`[Text-to-Speech] Successfully regenerated voice with ID: ${regeneratedVoiceId}`);
+              
+              // Try again with the new voice ID
+              const retryResponse = await fetch(
+                `https://api.elevenlabs.io/v1/text-to-speech/${regeneratedVoiceId}`,
+                {
+                  method: 'POST',
+                  headers: {
+                    'xi-api-key': process.env.ELEVEN_LABS_API_KEY || '',
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    text,
+                    model_id: 'eleven_multilingual_v2',
+                    voice_settings: {
+                      stability: 0.5,
+                      similarity_boost: 0.75,
+                    },
+                  }),
+                }
+              );
+              
+              if (retryResponse.ok) {
+                // Get the audio as arrayBuffer and convert to base64
+                const audioArrayBuffer = await retryResponse.arrayBuffer();
+                const audioBase64 = Buffer.from(audioArrayBuffer).toString('base64');
+                
+                console.log(`[Text-to-Speech] Successfully generated speech with regenerated voice for ${name}`);
+                
+                // Return the base64-encoded audio
+                return NextResponse.json({
+                  audioUrl: `data:audio/mpeg;base64,${audioBase64}`,
+                  voiceId: regeneratedVoiceId,
+                  regenerated: true
+                });
+              } else {
+                console.error('[Text-to-Speech] Retry with regenerated voice failed');
+              }
+            }
+          } catch (regenerateError) {
+            console.error('[Text-to-Speech] Error regenerating voice:', regenerateError);
+          }
+        }
+        
+        // If regeneration failed or was not attempted, fall back to default voice
+        console.log('[Text-to-Speech] Falling back to default voice');
+        const defaultVoiceId = process.env.DEFAULT_VOICE_ID || 'pNInz6obpgDQGcFmaJgB';
+        
+        const fallbackResponse = await fetch(
+          `https://api.elevenlabs.io/v1/text-to-speech/${defaultVoiceId}`,
+          {
+            method: 'POST',
+            headers: {
+              'xi-api-key': process.env.ELEVEN_LABS_API_KEY || '',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              text,
+              model_id: 'eleven_multilingual_v2',
+              voice_settings: {
+                stability: 0.5,
+                similarity_boost: 0.75,
+              },
+            }),
+          }
+        );
+        
+        if (fallbackResponse.ok) {
+          // Get the audio as arrayBuffer and convert to base64
+          const audioArrayBuffer = await fallbackResponse.arrayBuffer();
+          const audioBase64 = Buffer.from(audioArrayBuffer).toString('base64');
+          
+          console.log(`[Text-to-Speech] Successfully generated speech with default voice`);
+          
+          // Return the base64-encoded audio
+          return NextResponse.json({
+            audioUrl: `data:audio/mpeg;base64,${audioBase64}`,
+            voiceId: defaultVoiceId,
+            fallback: true
+          });
+        }
+      }
+      
       return NextResponse.json(
         { error: 'Failed to generate speech' },
         { status: 500 }

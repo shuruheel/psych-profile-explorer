@@ -482,12 +482,16 @@ export default function ProfileViewer() {
             </div>
             
             {dropdownOpen && (
-              <div className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-popover py-1 shadow-md border border-border">
+              <div className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 shadow-md border border-border">
                 {filteredProfileNames.length > 0 ? (
                   filteredProfileNames.map((profile, index) => (
                     <div
                       key={profile.name}
-                      className={`relative flex cursor-pointer select-none items-center px-3 py-2 text-sm transition-colors ${index === activeIndex ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50 hover:text-accent-foreground'}`}
+                      className={`relative flex cursor-pointer select-none items-center px-3 py-2 text-sm transition-colors ${
+                        index === activeIndex 
+                          ? 'bg-gray-900 text-white' 
+                          : 'hover:bg-gray-800 hover:text-white'
+                      }`}
                       onClick={() => handleProfileChange(profile.name)}
                       onMouseEnter={() => setActiveIndex(index)}
                     >
@@ -534,7 +538,16 @@ export default function ProfileViewer() {
                 ))
               ) : null}
               
-              <Button 
+
+            </div>
+          </div>
+        </CardHeader>
+        
+        <CardContent className="pt-3">
+          
+          <div className="flex items-center justify-between w-full mb-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 text-sm text-muted-foreground">
+            <Button 
                 onClick={() => {
                   setConversationOpen(true);
                   // Add a temporary loading message
@@ -549,17 +562,12 @@ export default function ProfileViewer() {
                   }
                 }} 
                 className="ml-auto gap-1.5"
-                variant="secondary"
+                variant="default"
+                style={{ backgroundColor: '#1a1a1a', color: 'white' }}
               >
                 <MessageSquare className="h-4 w-4" />
                 <span>Talk to {selectedProfile?.name?.split(' ')[0]}</span>
               </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-3">
-          <div className="flex items-center justify-between w-full mb-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 text-sm text-muted-foreground">
               <div className="flex-1 flex items-center p-2 bg-background rounded-md border">
                 <span className="mr-2 font-medium whitespace-nowrap">Assesssment Confidence:</span>
                 <Progress 

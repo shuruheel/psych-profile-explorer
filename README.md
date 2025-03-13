@@ -1,36 +1,84 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Psychological Profiles Viewer
+
+A Next.js application for viewing and exploring psychological profiles of historical figures stored in a Neo4j graph database.
+
+## Features
+
+- View psychological profiles of historical figures
+- Detailed personality traits, cognitive styles, emotional profiles, and more
+- Interactive UI for exploring different aspects of each profile
+- Connected to Neo4j AuraDB for data storage and retrieval
+
+## Prerequisites
+
+- Node.js 18.x or higher
+- A Neo4j AuraDB instance with your psychological profiles data
 
 ## Getting Started
 
-First, run the development server:
+1. Clone the repository
+
+```bash
+git clone <repository-url>
+cd psychological-profiles
+```
+
+2. Install dependencies
+
+```bash
+npm install
+```
+
+3. Set up environment variables
+   
+Create a `.env` file in the root directory with your Neo4j AuraDB credentials:
+
+```env
+NEO4J_URI=bolt://your-neo4j-uri.databases.neo4j.io:7687
+NEO4J_USERNAME=your-username
+NEO4J_PASSWORD=your-password
+```
+
+4. Run the development server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) to see the application.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Neo4j Database Structure
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The application expects Neo4j nodes with the following structure:
 
-## Learn More
+- Node label: `Person`
+- Node properties:
+  - `name`: Name of the historical figure
+  - `nodeType`: "Entity"
+  - `subType`: "Person"
+  - `biography`: Brief biographical summary
+  - `aliases`: Array of alternative names
+  - `personalityTraits`: Array of personality traits with evidence and confidence
+  - `cognitiveStyle`: Object containing decision-making style, problem-solving approach, etc.
+  - `emotionalProfile`: Object containing emotional disposition and triggers
+  - `relationalDynamics`: Object containing interpersonal style and power dynamics
+  - `valueSystem`: Object containing core values and ethical framework
+  - `psychologicalDevelopment`: Array of developmental periods with changes and catalysts
+  - Various other fields as specified in the profile schema
 
-To learn more about Next.js, take a look at the following resources:
+## Data Schema
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+See the JSON schema in the codebase for the full structure of each profile.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Technologies Used
 
-## Deploy on Vercel
+- Next.js 15.x
+- React 19.x
+- Neo4j Database
+- Tailwind CSS
+- Radix UI Components
+- Recharts for data visualization
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## License
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+[Your License Here]

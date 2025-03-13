@@ -5,9 +5,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
-import { AlertCircle, Brain, Heart, Users, Lightbulb, TimerIcon as Timeline, FileText, Search } from "lucide-react"
+import { AlertCircle, Brain, Heart, Users, Lightbulb, TimerIcon as Timeline, FileText, Search, MessageSquare } from "lucide-react"
 import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
 import { useClickOutside, useEscapeKey } from "@/lib/hooks"
+import { ConversationDialog } from "@/components/conversation-dialog"
+import { Profile, PersonalityTrait, EmotionalTrigger, Loyalty, CoreValue, DevelopmentPeriod } from "@/types/profile"
 
 // Sample data - in a real app, this would come from an API
 const sampleProfiles = [
@@ -136,90 +139,6 @@ const sampleProfiles = [
   },
 ]
 
-// Define the Profile type based on our schema
-interface PersonalityTrait {
-  trait: string
-  evidence: string[]
-  confidence: number
-}
-
-interface EmotionalTrigger {
-  trigger: string
-  reaction: string
-  evidence: string[]
-}
-
-interface Loyalty {
-  target: string
-  strength: number
-  evidence: string[]
-}
-
-interface CoreValue {
-  value: string
-  importance: number
-  consistency: number
-}
-
-interface DevelopmentPeriod {
-  period: string
-  changes: string
-  catalysts: string[]
-}
-
-interface Profile {
-  name: string
-  nodeType: string
-  subType: string
-  biography: string
-  aliases: string[]
-  personalityTraits: PersonalityTrait[]
-  cognitiveStyle: {
-    decisionMaking: string
-    problemSolving: string
-    worldview: string
-    biases: string[]
-  }
-  emotionalProfile: {
-    emotionalDisposition: string
-    emotionalTriggers: EmotionalTrigger[]
-  }
-  relationalDynamics: {
-    interpersonalStyle: string
-    powerDynamics: {
-      authorityResponse: string
-      subordinateManagement: string
-      negotiationTactics: string[]
-    }
-    loyalties: Loyalty[]
-  }
-  valueSystem: {
-    coreValues: CoreValue[]
-    ethicalFramework: string
-  }
-  psychologicalDevelopment: DevelopmentPeriod[]
-  metaAttributes: {
-    authorBias: number
-    portrayalConsistency: number
-    controversialAspects: string[]
-  }
-  modelConfidence: number
-  evidenceStrength: number
-  // Additional fields from the database schema
-  description?: string
-  keyContributions?: string[]
-  observations?: string[]
-  emotionalValence?: number
-  emotionalArousal?: number
-  personalitySummary?: string
-  decisionMaking?: string
-  emotionalDisposition?: string
-  interpersonalStyle?: string
-  ethicalFramework?: string
-  source?: string
-  confidence?: number
-}
-
 // Helper function to safely access properties
 const getSafe = {
   personalityTraits: (profile: Profile | null) => profile?.personalityTraits || [],
@@ -258,6 +177,7 @@ export default function ProfileViewer() {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState<number>(-1)
   const [profileLoading, setProfileLoading] = useState(false)
+  const [conversationOpen, setConversationOpen] = useState(false)
   
   // Filtered profile names based on search query
   const filteredProfileNames = profileNames.filter(profile => 
@@ -441,19 +361,28 @@ export default function ProfileViewer() {
   // Safely access nested properties with fallbacks
   const safeAccess = {
     // Personality traits section
-    getPersonalityTraits: () => getSafe.personalityTraits(selectedProfile),
+    getPersonalityTraits: () => {
+      const traits = getSafe.personalityTraits(selectedProfile);
+      return Array.isArray(traits) ? traits : [];
+    },
     
     // Cognitive style section
     getCognitiveStyle: () => getSafe.cognitiveStyle(selectedProfile),
     getCognitiveDecisionMaking: () => getSafe.cognitiveStyle(selectedProfile)?.decisionMaking || selectedProfile?.decisionMaking || 'Not specified',
     getCognitiveProblemSolving: () => getSafe.cognitiveStyle(selectedProfile)?.problemSolving || 'Not specified',
     getCognitiveWorldview: () => getSafe.cognitiveStyle(selectedProfile)?.worldview || 'Not specified',
-    getCognitiveBiases: () => getSafe.cognitiveStyle(selectedProfile)?.biases || [],
+    getCognitiveBiases: () => {
+      const biases = getSafe.cognitiveStyle(selectedProfile)?.biases;
+      return Array.isArray(biases) ? biases : [];
+    },
     
     // Emotional profile section
     getEmotionalProfile: () => getSafe.emotionalProfile(selectedProfile),
     getEmotionalDisposition: () => getSafe.emotionalProfile(selectedProfile)?.emotionalDisposition || selectedProfile?.emotionalDisposition || 'Not specified',
-    getEmotionalTriggers: () => getSafe.emotionalProfile(selectedProfile)?.emotionalTriggers || [],
+    getEmotionalTriggers: () => {
+      const triggers = getSafe.emotionalProfile(selectedProfile)?.emotionalTriggers;
+      return Array.isArray(triggers) ? triggers : [];
+    },
     
     // Relational dynamics section
     getRelationalDynamics: () => getSafe.relationalDynamics(selectedProfile),
@@ -461,20 +390,35 @@ export default function ProfileViewer() {
     getPowerDynamics: () => getSafe.relationalDynamics(selectedProfile)?.powerDynamics || {},
     getAuthorityResponse: () => getSafe.relationalDynamics(selectedProfile)?.powerDynamics?.authorityResponse || 'Not specified',
     getSubordinateManagement: () => getSafe.relationalDynamics(selectedProfile)?.powerDynamics?.subordinateManagement || 'Not specified',
-    getNegotiationTactics: () => getSafe.relationalDynamics(selectedProfile)?.powerDynamics?.negotiationTactics || [],
-    getLoyalties: () => getSafe.relationalDynamics(selectedProfile)?.loyalties || [],
+    getNegotiationTactics: () => {
+      const tactics = getSafe.relationalDynamics(selectedProfile)?.powerDynamics?.negotiationTactics;
+      return Array.isArray(tactics) ? tactics : [];
+    },
+    getLoyalties: () => {
+      const loyalties = getSafe.relationalDynamics(selectedProfile)?.loyalties;
+      return Array.isArray(loyalties) ? loyalties : [];
+    },
     
     // Value system section
     getValueSystem: () => getSafe.valueSystem(selectedProfile),
-    getCoreValues: () => getSafe.valueSystem(selectedProfile)?.coreValues || [],
+    getCoreValues: () => {
+      const values = getSafe.valueSystem(selectedProfile)?.coreValues;
+      return Array.isArray(values) ? values : [];
+    },
     getEthicalFramework: () => getSafe.valueSystem(selectedProfile)?.ethicalFramework || selectedProfile?.ethicalFramework || 'Not specified',
     
     // Psychological development section
-    getPsychologicalDevelopment: () => getSafe.psychologicalDevelopment(selectedProfile),
+    getPsychologicalDevelopment: () => {
+      const development = getSafe.psychologicalDevelopment(selectedProfile);
+      return Array.isArray(development) ? development : [];
+    },
     
     // Meta attributes section
     getMetaAttributes: () => getSafe.metaAttributes(selectedProfile),
-    getControversialAspects: () => getSafe.metaAttributes(selectedProfile)?.controversialAspects || [],
+    getControversialAspects: () => {
+      const aspects = getSafe.metaAttributes(selectedProfile)?.controversialAspects;
+      return Array.isArray(aspects) ? aspects : [];
+    },
     getAuthorBias: () => getSafe.metaAttributes(selectedProfile)?.authorBias || 0,
     getPortrayalConsistency: () => getSafe.metaAttributes(selectedProfile)?.portrayalConsistency || 0,
   };
@@ -589,6 +533,15 @@ export default function ProfileViewer() {
                   </Badge>
                 ))
               ) : null}
+              
+              <Button 
+                onClick={() => setConversationOpen(true)} 
+                className="ml-auto gap-1.5"
+                variant="secondary"
+              >
+                <MessageSquare className="h-4 w-4" />
+                <span>Talk to {selectedProfile?.name?.split(' ')[0]}</span>
+              </Button>
             </div>
           </div>
         </CardHeader>
@@ -1015,6 +968,12 @@ export default function ProfileViewer() {
           </div>
         </div>
       )}
+      
+      <ConversationDialog 
+        open={conversationOpen} 
+        onOpenChange={setConversationOpen} 
+        profile={selectedProfile} 
+      />
     </div>
   )
 }

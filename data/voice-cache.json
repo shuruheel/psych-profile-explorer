@@ -1,37 +1,3 @@
 {
-  "Konrad Adenauer": {
-    "voiceId": "RiLgyYNR7XT94wuKyOsR",
-    "timestamp": "2025-03-13T22:08:31.337Z",
-    "profileName": "Konrad Adenauer"
-  },
-  "Chris Voss": {
-    "voiceId": "6t3YuBbCMowmi140AffS",
-    "timestamp": "2025-03-13T22:14:33.026Z",
-    "profileName": "Chris Voss"
-  },
-  "Margaret Thatcher": {
-    "voiceId": "VJ2jzEIoR6UWW9h6MNhr",
-    "timestamp": "2025-03-13T22:18:21.163Z",
-    "profileName": "Margaret Thatcher"
-  },
-  "Henry Kissinger": {
-    "voiceId": "kRZNNPiBtNSM5OeDukvQ",
-    "timestamp": "2025-03-13T22:19:17.809Z",
-    "profileName": "Henry Kissinger"
-  },
-  "Vladimir Putin": {
-    "voiceId": "zVlSQpRk914mzuFQ2zgF",
-    "timestamp": "2025-03-13T23:02:49.079Z",
-    "profileName": "Vladimir Putin"
-  },
-  "Socrates": {
-    "voiceId": "kxdNoVTcTtDTtc2KHMBQ",
-    "timestamp": "2025-03-13T23:05:55.361Z",
-    "profileName": "Socrates"
-  },
-  "Donald Trump": {
-    "voiceId": "8MHzkW9dlwOmZkVaY3tF",
-    "timestamp": "2025-03-13T23:11:31.021Z",
-    "profileName": "Donald Trump"
-  }
+
 }

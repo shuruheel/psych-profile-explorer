@@ -535,7 +535,19 @@ export default function ProfileViewer() {
               ) : null}
               
               <Button 
-                onClick={() => setConversationOpen(true)} 
+                onClick={() => {
+                  setConversationOpen(true);
+                  // Add a temporary loading message
+                  const loadingMessage = `I'm preparing my voice model to sound like ${selectedProfile?.name}. This may take a moment...`;
+                  if (selectedProfile) {
+                    // If there's no cache yet, show loading
+                    const firstTimeUser = localStorage.getItem(`voice_${selectedProfile.name}`) !== 'cached';
+                    if (firstTimeUser) {
+                      // Set localStorage flag for this profile
+                      localStorage.setItem(`voice_${selectedProfile.name}`, 'loading');
+                    }
+                  }
+                }} 
                 className="ml-auto gap-1.5"
                 variant="secondary"
               >

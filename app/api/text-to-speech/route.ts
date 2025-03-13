@@ -29,7 +29,11 @@ export async function POST(request: Request) {
       } else {
         // Call voice design API to generate a voice
         try {
-          const voiceResponse = await fetch('/api/voice-design', {
+          // Get base URL from environment or construct it
+          const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
+                         (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+          
+          const voiceResponse = await fetch(new URL('/api/voice-design', 'http://localhost:3000').toString(), {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

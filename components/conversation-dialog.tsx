@@ -30,21 +30,46 @@ export function ConversationDialog({ open, onOpenChange, profile }: Conversation
   const [isPlaying, setIsPlaying] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
   const [selectedModel, setSelectedModel] = useState("openai")
+  const [isVoiceLoading, setIsVoiceLoading] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   
   // Create a welcome message when dialog opens
   useEffect(() => {
     if (open && profile && messages.length === 0) {
-      setMessages([
-        { 
-          role: "assistant", 
-          content: `Hello, I am ${profile.name}. What would you like to discuss?` 
-        }
-      ])
+      // Check if this is the first time loading this profile
+      const isFirstTime = localStorage.getItem(`voice_${profile.name}`) === 'loading';
       
-      // Generate audio for the welcome message
-      generateSpeech(`Hello, I am ${profile.name}. What would you like to discuss?`, profile.name)
+      if (isFirstTime) {
+        setIsVoiceLoading(true);
+        setMessages([
+          { 
+            role: "assistant", 
+            content: `I'm preparing my voice model to sound like ${profile.name}. This may take a moment...` 
+          }
+        ]);
+        
+        // Call the voice design API to generate the voice
+        generateVoiceDesign(profile);
+        
+        // Start polling for voice status
+        const pollInterval = setInterval(() => {
+          checkVoiceStatus(profile.name);
+        }, 3000); // Check every 3 seconds
+        
+        // Clear interval when component unmounts or dialog closes
+        return () => clearInterval(pollInterval);
+      } else {
+        setMessages([
+          { 
+            role: "assistant", 
+            content: `Hello, I am ${profile.name}. What would you like to discuss?` 
+          }
+        ]);
+        
+        // Generate audio for the welcome message
+        generateSpeech(`Hello, I am ${profile.name}. What would you like to discuss?`, profile.name);
+      }
     }
   }, [open, profile, messages.length])
   
@@ -96,6 +121,13 @@ export function ConversationDialog({ open, onOpenChange, profile }: Conversation
         }
       ])
       
+      // If we were in voice loading state, we're done now
+      if (isVoiceLoading) {
+        setIsVoiceLoading(false);
+        // Update localStorage to indicate this profile's voice is now cached
+        localStorage.setItem(`voice_${profile.name}`, 'cached');
+      }
+      
       // Play audio if available and not muted
       if (data.audioUrl && !isMuted) {
         audioRef.current = new Audio(data.audioUrl)
@@ -112,6 +144,11 @@ export function ConversationDialog({ open, onOpenChange, profile }: Conversation
           content: "I apologize, but I'm having trouble responding right now. Please try again later."
         }
       ])
+      
+      // Clear voice loading state if there was an error
+      if (isVoiceLoading) {
+        setIsVoiceLoading(false);
+      }
     } finally {
       setIsLoading(false)
     }
@@ -127,7 +164,8 @@ export function ConversationDialog({ open, onOpenChange, profile }: Conversation
         },
         body: JSON.stringify({
           text,
-          name
+          name,
+          profile
         }),
       })
       
@@ -137,19 +175,35 @@ export function ConversationDialog({ open, onOpenChange, profile }: Conversation
       
       const data = await response.json()
       
-      // Update the last message with the audio URL
-      setMessages((prev) => {
-        const lastIndex = prev.length - 1
-        if (lastIndex >= 0 && prev[lastIndex].role === "assistant") {
-          const updatedMessages = [...prev]
-          updatedMessages[lastIndex] = {
-            ...updatedMessages[lastIndex],
+      // If we were in voice loading state, we're done now
+      if (isVoiceLoading) {
+        setIsVoiceLoading(false)
+        // Update localStorage to indicate this profile's voice is now cached
+        if (profile) {
+          localStorage.setItem(`voice_${profile.name}`, 'cached')
+          
+          // Update the first message to the actual greeting
+          setMessages([{ 
+            role: "assistant", 
+            content: `Hello, I am ${profile.name}. What would you like to discuss?`,
             audioUrl: data.audioUrl
-          }
-          return updatedMessages
+          }])
         }
-        return prev
-      })
+      } else {
+        // Normal flow - update the last message with the audio URL
+        setMessages((prev) => {
+          const lastIndex = prev.length - 1
+          if (lastIndex >= 0 && prev[lastIndex].role === "assistant") {
+            const updatedMessages = [...prev]
+            updatedMessages[lastIndex] = {
+              ...updatedMessages[lastIndex],
+              audioUrl: data.audioUrl
+            }
+            return updatedMessages
+          }
+          return prev
+        })
+      }
       
       // Play audio if not muted
       if (data.audioUrl && !isMuted) {
@@ -160,6 +214,18 @@ export function ConversationDialog({ open, onOpenChange, profile }: Conversation
       }
     } catch (error) {
       console.error("Error generating speech:", error)
+      
+      // Clear voice loading state if there was an error
+      if (isVoiceLoading) {
+        setIsVoiceLoading(false)
+        // Fall back to text-only message
+        if (profile) {
+          setMessages([{ 
+            role: "assistant", 
+            content: `Hello, I am ${profile.name}. What would you like to discuss?`
+          }])
+        }
+      }
     }
   }
   
@@ -217,13 +283,77 @@ export function ConversationDialog({ open, onOpenChange, profile }: Conversation
     }
   }
   
+  // Generate voice design for a new profile
+  const generateVoiceDesign = async (profile: Profile) => {
+    try {
+      console.log(`Generating voice design for ${profile.name}...`);
+      
+      const response = await fetch("/api/voice-design", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ profile }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to generate voice design: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log(`Voice design generated successfully with ID: ${data.voiceId}`);
+      
+      // Once voice is designed, generate the welcome speech
+      generateSpeech(`Hello, I am ${profile.name}. What would you like to discuss?`, profile.name);
+      
+    } catch (error) {
+      console.error("Error generating voice design:", error);
+      setIsVoiceLoading(false);
+      
+      // Fall back to text-only message
+      setMessages([{ 
+        role: "assistant", 
+        content: `Hello, I am ${profile.name}. What would you like to discuss?`
+      }]);
+    }
+  };
+  
+  // Check if voice generation is complete
+  const checkVoiceStatus = async (name: string) => {
+    try {
+      const response = await fetch(`/api/voice-status?name=${encodeURIComponent(name)}`);
+      
+      if (!response.ok) {
+        console.error("Error checking voice status:", response.statusText);
+        return;
+      }
+      
+      const data = await response.json();
+      
+      if (data.status === 'ready' && isVoiceLoading) {
+        console.log(`Voice for ${name} is ready with ID: ${data.voiceId}`);
+        
+        // Voice is ready, update UI and generate welcome message
+        generateSpeech(`Hello, I am ${name}. What would you like to discuss?`, name);
+        
+        // Update local storage to indicate voice is cached
+        localStorage.setItem(`voice_${name}`, 'cached');
+      }
+    } catch (error) {
+      console.error("Error checking voice status:", error);
+    }
+  };
+  
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl h-[80vh] flex flex-col">
         <DialogHeader className="flex flex-row items-center justify-between">
           <div className="flex items-center gap-2">
             <Avatar className="h-10 w-10">
-              <div className="flex h-full w-full items-center justify-center bg-muted text-xl font-semibold uppercase">
+              <div 
+                className="flex h-full w-full items-center justify-center text-xl font-semibold uppercase"
+                style={{ backgroundColor: 'var(--color-muted)' }}
+              >
                 {profile?.name?.charAt(0) || "?"}
               </div>
             </Avatar>
@@ -258,11 +388,15 @@ export function ConversationDialog({ open, onOpenChange, profile }: Conversation
                 className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
               >
                 <div 
-                  className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                    message.role === "user" 
-                      ? "bg-primary text-primary-foreground" 
-                      : "bg-muted"
-                  }`}
+                  className={`max-w-[80%] rounded-lg px-4 py-2`}
+                  style={{
+                    backgroundColor: message.role === "user" 
+                      ? 'var(--color-primary)' 
+                      : 'var(--color-muted)',
+                    color: message.role === "user" 
+                      ? 'var(--color-primary-foreground)' 
+                      : 'var(--color-foreground)'
+                  }}
                 >
                   <p className="text-sm">{message.content}</p>
                   
@@ -308,7 +442,14 @@ export function ConversationDialog({ open, onOpenChange, profile }: Conversation
               className="flex-1"
             />
           </div>
-          <Button onClick={handleSendMessage} disabled={isLoading || !input.trim()}>
+          <Button 
+            onClick={handleSendMessage} 
+            disabled={isLoading || !input.trim()}
+            style={{
+              backgroundColor: 'var(--color-primary)',
+              color: 'var(--color-primary-foreground)'
+            }}
+          >
             {isLoading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (

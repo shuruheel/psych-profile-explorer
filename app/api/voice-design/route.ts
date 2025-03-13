@@ -1,102 +1,186 @@
 import { NextResponse } from 'next/server';
 import { Profile } from '@/types/profile';
+import { voiceCache } from '../shared/voice-cache';
 
-// Cache for storing generated voice IDs to avoid regeneration
-const voiceCache: Record<string, string> = {};
+// Mark this route as dynamic to avoid static generation errors
+export const dynamic = 'force-dynamic';
 
 // Create a description for voice generation based on profile
 function createVoiceDescription(profile: Profile): string {
   // Extract key traits that would affect voice characteristics
-  const gender = profile.gender || (profile.subType === 'Person' ? 'unknown' : 'neutral');
+  const gender = profile.gender?.toLowerCase() || 'neutral';
   
-  const emotionalDisposition = profile.emotionalProfile?.emotionalDisposition || 
+  const emotionalTone = profile.emotionalProfile?.emotionalDisposition || 
     profile.emotionalDisposition || 'neutral';
   
-  const personalityTraits = profile.personalityTraits && profile.personalityTraits.length > 0
-    ? profile.personalityTraits.map(trait => trait.trait).join(', ')
-    : 'balanced, neutral';
+  // Convert personality traits to voice qualities
+  const voiceQualities = profile.personalityTraits && profile.personalityTraits.length > 0
+    ? profile.personalityTraits
+        .map(trait => {
+          // Map personality traits to voice characteristics
+          switch(trait.trait.toLowerCase()) {
+            case 'confident': return 'strong and clear';
+            case 'gentle': return 'soft and warm';
+            case 'analytical': return 'precise and measured';
+            case 'energetic': return 'dynamic and expressive';
+            default: return 'balanced';
+          }
+        })
+        .join(', ')
+    : 'balanced, natural';
   
-  // Age determination from profile
-  let age = profile.age || 'adult';
-  // If birthYear and deathYear are available, calculate approximate age at death or current age
-  if (profile.birthYear && profile.deathYear) {
-    const ageAtDeath = profile.deathYear - profile.birthYear;
-    if (ageAtDeath < 30) age = 'young';
-    else if (ageAtDeath > 60) age = 'elderly';
-    else age = 'middle-aged';
+  // Age mapped to voice maturity
+  let voiceMaturity = 'mature';
+  if (profile.age) {
+    const ageNum = Number(profile.age);
+    if (ageNum < 30) voiceMaturity = 'youthful';
+    else if (ageNum > 60) voiceMaturity = 'seasoned';
   }
+
+  // Add nationality and accent if available
+  const nationality = profile.nationality ? `${profile.nationality} ` : '';
+  const accent = profile.accent ? ` with a ${profile.accent} accent` : '';
   
-  // Extract nationality or default to a neutral value
-  const nationality = profile.nationality || '';
-  
-  // Create a rich description for the voice design API using the new template format
-  return `A ${age} ${nationality} ${gender} with a ${emotionalDisposition.toLowerCase()} voice. 
-  Speaks with a ${profile.relationalDynamics?.interpersonalStyle || 'neutral'} style that is 
-  ${profile.cognitiveStyle?.decisionMaking || 'balanced'} and ${personalityTraits.toLowerCase()}. 
-  ${profile.biography ? `Known for: ${profile.biography.substring(0, 100)}` : ''}`;
+  // Create voice description focusing on qualities rather than identity
+  return `A ${voiceMaturity} ${gender === 'female' ? 'female' : gender === 'male' ? 'male' : 'gender-neutral'} ${nationality}voice${accent} with ${voiceQualities} qualities. 
+  The voice has a ${emotionalTone.toLowerCase()} emotional tone and speaks in a 
+  ${profile.relationalDynamics?.interpersonalStyle || 'natural'} manner. 
+  The speaking style is ${profile.cognitiveStyle?.decisionMaking || 'balanced'} and thoughtful.`;
 }
 
-// Generate example text based on the profile for the voice preview
+// Generate example text using quotes from profile evidence
 function generateExampleText(profile: Profile): string {
-  // Use biography or create a generic statement
-  let text = "";
+  const quotes: string[] = [];
   
-  if (profile.biography && profile.biography.length >= 100) {
-    // Use part of biography if it's long enough
-    text = profile.biography.substring(0, 900);
-  } else {
-    // Create a generic but historically plausible statement based on the person's traits
-    const traits = profile.personalityTraits.map(t => t.trait.toLowerCase());
-    const disposition = profile.emotionalProfile?.emotionalDisposition.toLowerCase() || 'contemplative';
+  // Collect quotes from personality traits evidence
+  profile.personalityTraits?.forEach(trait => {
+    trait.evidence?.forEach(evidence => {
+      // If evidence starts with a quote mark, it's likely a direct quote
+      if (evidence.startsWith('"') || evidence.startsWith('"')) {
+        quotes.push(evidence.replace(/[""]/g, '"'));
+      }
+    });
+  });
+  
+  // Collect quotes from emotional triggers evidence
+  profile.emotionalProfile?.emotionalTriggers?.forEach(trigger => {
+    trigger.evidence?.forEach(evidence => {
+      if (evidence.startsWith('"') || evidence.startsWith('"')) {
+        quotes.push(evidence.replace(/[""]/g, '"'));
+      }
+    });
+  });
+  
+  // Collect quotes from loyalties evidence
+  profile.relationalDynamics?.loyalties?.forEach(loyalty => {
+    loyalty.evidence?.forEach(evidence => {
+      if (evidence.startsWith('"') || evidence.startsWith('"')) {
+        quotes.push(evidence.replace(/[""]/g, '"'));
+      }
+    });
+  });
+  
+  // If we found any quotes, use them
+  if (quotes.length > 0) {
+    // Join quotes with proper spacing and punctuation
+    let text = quotes.join(' ');
     
-    text = `As I reflect on my life's work and the principles that have guided me, I find that ${traits[0] || 'curiosity'} 
-    and ${traits[1] || 'determination'} have been central to my approach. When facing challenges, I tend to be ${disposition} 
-    and methodical. Throughout my experiences, I've developed a perspective that values ${profile.valueSystem?.coreValues[0]?.value || 'truth'} 
-    above all else. The questions we ask about our world define us as much as the answers we discover.
+    // Ensure text length meets API requirements (100-1000 characters)
+    if (text.length < 100) {
+      // If quotes are too short, add some context
+      text = `In their own words: ${text}`;
+      // If still too short, pad with a generic statement
+      if (text.length < 100) {
+        text = text.padEnd(100, ' These words reflect their authentic voice and perspective.');
+      }
+    } else if (text.length > 1000) {
+      // If too long, truncate while keeping complete sentences
+      text = text.substring(0, 997) + '...';
+    }
     
-    I believe that ${profile.cognitiveStyle?.worldview || 'the natural world operates according to consistent principles'}, 
-    and my work has been dedicated to understanding these patterns. When I interact with others, I approach them with 
-    ${profile.relationalDynamics?.interpersonalStyle || 'respect'} and attempt to ${profile.relationalDynamics?.powerDynamics?.negotiationTactics[0] || 'find common ground'}.
-    
-    The most profound insights often come when we ${profile.cognitiveStyle?.problemSolving || 'carefully analyze the evidence before us'}, 
-    rather than accepting conventional wisdom without question.`;
+    return text;
   }
   
-  // Ensure text is between 100-1000 characters as required by the API
-  if (text.length < 100) {
-    text = text.padEnd(100, ' The pursuit of knowledge requires both patience and persistence.');
-  } else if (text.length > 1000) {
-    text = text.substring(0, 1000);
+  // Fallback to a generic philosophical text if no quotes are available
+  return `The nature of understanding requires careful consideration. 
+  When we examine the world around us, we find patterns and meanings that shape our perspective. 
+  Through careful observation and thoughtful analysis, we can better comprehend the complexity 
+  of our shared experiences.`;
+}
+
+// Function to enrich profile with LLM-generated biographical information
+async function enrichProfileWithBiographicalDetails(profile: Profile): Promise<Profile> {
+  try {
+    console.log(`[Voice Design] Starting profile enrichment for ${profile.name}...`);
+    
+    // Skip enrichment if we already have gender information
+    if (profile.gender) {
+      console.log(`[Voice Design] Profile already has gender info, skipping enrichment`);
+      return profile;
+    }
+    
+    // Get base URL from environment or construct it
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
+                   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+    
+    console.log(`[Voice Design] Calling profile-enrichment API...`);
+    const response = await fetch(`${baseUrl}/api/profile-enrichment`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ profile }),
+    });
+    
+    if (!response.ok) {
+      console.error(`[Voice Design] Failed to enrich profile: ${await response.text()}`);
+      return profile; // Return original profile if enrichment fails
+    }
+    
+    const data = await response.json();
+    console.log(`[Voice Design] Successfully enriched profile with: ${JSON.stringify(data.enhancedData)}`);
+    return data.enrichedProfile;
+  } catch (error) {
+    console.error(`[Voice Design] Error enriching profile:`, error);
+    return profile; // Return original profile on error
   }
-  
-  return text;
 }
 
 export async function POST(request: Request) {
   try {
+    console.log(`[Voice Design API] Request received`);
     const { profile } = await request.json();
     
     if (!profile || !profile.name) {
+      console.log(`[Voice Design API] Invalid profile data`);
       return NextResponse.json(
         { error: 'Missing profile data' },
         { status: 400 }
       );
     }
     
+    console.log(`[Voice Design API] Processing request for ${profile.name}`);
+    
     // Check if we already have a generated voice ID for this profile
     if (voiceCache[profile.name]) {
+      console.log(`[Voice Design API] Using cached voice ID for ${profile.name}: ${voiceCache[profile.name]}`);
       return NextResponse.json({
         voiceId: voiceCache[profile.name],
         cached: true
       });
     }
     
-    // Create voice description from profile
-    const voiceDescription = createVoiceDescription(profile);
+    console.log(`[Voice Design API] No cached voice found, enriching profile...`);
+    const enrichedProfile = await enrichProfileWithBiographicalDetails(profile);
+    
+    // Create voice description from enriched profile
+    const voiceDescription = createVoiceDescription(enrichedProfile);
+    console.log(`[Voice Design API] Created voice description: ${voiceDescription.substring(0, 100)}...`);
     
     // Generate example text for the voice preview
-    const exampleText = generateExampleText(profile);
+    const exampleText = generateExampleText(enrichedProfile);
     
+    console.log(`[Voice Design API] Calling Eleven Labs Voice Design API...`);
     // Call Eleven Labs Voice Design API using the latest endpoint
     const response = await fetch(
       'https://api.elevenlabs.io/v1/text-to-voice/create-previews',
@@ -114,20 +198,23 @@ export async function POST(request: Request) {
     );
     
     if (!response.ok) {
-      const errorData = await response.json();
-      console.error('Eleven Labs Voice Design API error:', errorData);
+      const errorText = await response.text();
+      console.error(`[Voice Design API] Eleven Labs API error (${response.status}):`, errorText);
       
       // If voice design fails, fall back to default voice
       return NextResponse.json({
         voiceId: process.env.DEFAULT_VOICE_ID,
-        fallback: true
+        fallback: true,
+        error: `API Error: ${response.status} - ${errorText.substring(0, 100)}`
       });
     }
     
     const voiceData = await response.json();
+    console.log(`[Voice Design API] Received voice previews: ${voiceData.previews?.length || 0}`);
     
     // Choose the first preview (we could add logic to let the user select from options in a real app)
     if (!voiceData.previews || voiceData.previews.length === 0) {
+      console.error(`[Voice Design API] No voice previews were generated`);
       return NextResponse.json({
         voiceId: process.env.DEFAULT_VOICE_ID,
         fallback: true,
@@ -136,7 +223,9 @@ export async function POST(request: Request) {
     }
     
     const generatedVoiceId = voiceData.previews[0].generated_voice_id;
+    console.log(`[Voice Design API] Generated voice ID: ${generatedVoiceId}`);
     
+    console.log(`[Voice Design API] Saving voice to make it permanent...`);
     // Save the voice to make it permanent
     const saveResponse = await fetch(
       'https://api.elevenlabs.io/v1/text-to-voice/create-voice-from-preview',
@@ -155,7 +244,8 @@ export async function POST(request: Request) {
     );
     
     if (!saveResponse.ok) {
-      console.error('Failed to save voice:', await saveResponse.json());
+      const saveErrorText = await saveResponse.text();
+      console.error(`[Voice Design API] Failed to save voice (${saveResponse.status}):`, saveErrorText);
       // We still return the generated_voice_id even if saving fails
       // as it can be used temporarily
       voiceCache[profile.name] = generatedVoiceId;
@@ -163,7 +253,7 @@ export async function POST(request: Request) {
       return NextResponse.json({
         voiceId: generatedVoiceId,
         generated: true,
-        warning: 'Voice generated but not saved permanently'
+        warning: `Voice generated but not saved permanently: ${saveResponse.status}`
       });
     }
     
@@ -173,17 +263,20 @@ export async function POST(request: Request) {
     // Store in cache
     voiceCache[profile.name] = permanentVoiceId;
     
+    console.log(`[Voice Design API] Voice successfully generated and saved for ${profile.name} with ID: ${permanentVoiceId}`);
     return NextResponse.json({
       voiceId: permanentVoiceId,
       generated: true,
-      saved: true
+      saved: true,
+      enrichedProfile: enrichedProfile
     });
     
   } catch (error) {
-    console.error('Error in voice design endpoint:', error);
+    console.error(`[Voice Design API] Unexpected error:`, error);
     return NextResponse.json(
       { 
         error: 'Internal server error', 
+        message: error instanceof Error ? error.message : 'Unknown error',
         voiceId: process.env.DEFAULT_VOICE_ID,
         fallback: true
       },

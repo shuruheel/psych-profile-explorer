@@ -92,4 +92,9 @@ export interface Profile {
   educationLevel?: string;
   languagesSpoken?: string[];
   socialClass?: string;
+  
+  // Additional fields for enhanced voice generation
+  nativeLanguage?: string;
+  accent?: string;
+  voiceCharacteristics?: string;
 } 

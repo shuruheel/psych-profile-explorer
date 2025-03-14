@@ -61,9 +61,10 @@ Please provide only the following biographical details (even if you have to make
 4. Death year (if applicable)
 5. Nationality
 6. Native language
-7. Notable accent or dialect characteristics
+7. Notable accent or dialect
 8. Historical era they belonged to
 9. Voice characteristics (deep, high-pitched, raspy, etc.)
+10. Speech patterns (pauses, intonations, etc.)
 
 Format your response as a JSON object with the following structure:
 {
@@ -75,7 +76,8 @@ Format your response as a JSON object with the following structure:
   "nativeLanguage": "",
   "accent": "",
   "era": "",
-  "voiceCharacteristics": ""
+  "voiceCharacteristics": "",
+  "speechPatterns": ""
 }
 `;
 
@@ -171,6 +173,7 @@ Format your response as a JSON object with the following structure:
       accent: enhancedProfileData.accent || profile.accent || null,
       era: enhancedProfileData.era || profile.era || null,
       voiceCharacteristics: enhancedProfileData.voiceCharacteristics || null,
+      speechPatterns: enhancedProfileData.speechPatterns || null,
     };
     
     console.log(`[Profile Enrichment API] Successfully enriched profile for ${profile.name}`);

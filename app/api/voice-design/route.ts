@@ -40,6 +40,9 @@ function createVoiceDescription(profile: Profile): string {
   // Add specific voice characteristics if available
   const voiceQualities = profile.voiceCharacteristics ? 
     `The voice is ${profile.voiceCharacteristics}. ` : '';
+
+  const speechPatterns = profile.speechPatterns ? 
+    `The voice has the following speech patterns: ${profile.speechPatterns}. ` : '';
   
   // Check if interpersonal style has valid data
   const interpersonalStyle = profile.relationalDynamics?.interpersonalStyle;

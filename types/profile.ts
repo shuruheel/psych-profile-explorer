@@ -97,4 +97,5 @@ export interface Profile {
   nativeLanguage?: string;
   accent?: string;
   voiceCharacteristics?: string;
+  speechPatterns?: string;
 } 

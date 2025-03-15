@@ -17,21 +17,17 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
-    console.log(`[Profile Enrichment API] Starting enrichment process...`);
     const { profile, provider = 'openai' } = await request.json();
     
     if (!profile || !profile.name) {
-      console.log(`[Profile Enrichment API] Error: Missing profile data`);
       return NextResponse.json(
-        { error: 'Missing profile data or profile name' },
+        { error: 'Missing required profile data' },
         { status: 400 }
       );
     }
     
-    console.log(`[Profile Enrichment API] Enriching profile for: ${profile.name} using ${provider}`);
-    
-    // Extract existing biographical information from the profile
-    const existingBio = {
+    // Log initial profile info for debugging
+    const bioInfo = {
       name: profile.name,
       biography: profile.biography || '',
       gender: profile.gender || '',
@@ -41,53 +37,41 @@ export async function POST(request: Request) {
       nationality: profile.nationality || '',
       nativeLanguage: profile.nativeLanguage || '',
       accent: profile.accent || '',
-      era: profile.era || '',
+      era: profile.era || ''
     };
     
-    console.log(`[Profile Enrichment API] Existing bio info: ${JSON.stringify(existingBio)}`);
+    console.log(`[Profile Enrichment] Enriching profile for ${profile.name} using ${provider}`);
+    console.log(`[Profile Enrichment] Current bio info:`, JSON.stringify(bioInfo));
     
-    // Build the prompt for the language model
-    const prompt = `
-You are an expert historian tasked with providing accurate biographical information about historical figures.
-I need factual information about ${profile.name} for voice synthesis purposes.
+    // Prepare the prompt for the AI
+    const prompt = `Given this historical figure's name and any available biographical information, please provide additional details about their voice and speech characteristics. Return ONLY a JSON object with the following fields (no other text):
 
-Current information I have:
-${JSON.stringify(existingBio, null, 2)}
-
-Please provide only the following biographical details (even if you have to make an educated guess based on historical facts):
-1. Gender (male/female/neutral)
-2. Approximate age during their notable period (young/middle-aged/elderly)
-3. Birth year (if known)
-4. Death year (if applicable)
-5. Nationality
-6. Native language
-7. Notable accent or dialect
-8. Historical era they belonged to
-9. Voice characteristics (deep, high-pitched, raspy, etc.)
-10. Speech patterns (pauses, intonations, etc.)
-
-Format your response as a JSON object with the following structure:
 {
-  "gender": "",
-  "age": "",
-  "birthYear": null,
-  "deathYear": null,
-  "nationality": "",
-  "nativeLanguage": "",
-  "accent": "",
-  "era": "",
-  "voiceCharacteristics": "",
-  "speechPatterns": ""
+  "gender": "male or female",
+  "age": "approximate age during their most prominent period (young/middle-aged/elderly)",
+  "birthYear": "birth year if known, or null",
+  "deathYear": "death year if known, or null",
+  "nationality": "their nationality",
+  "nativeLanguage": "their native language",
+  "accent": "description of their accent",
+  "era": "the time period they lived in (e.g., '19th century')",
+  "voiceCharacteristics": "description of their voice (e.g., deep, resonant, soft)",
+  "speechPatterns": "description of how they spoke (pace, formality, etc.)"
 }
-`;
 
-    console.log(`[Profile Enrichment API] Calling ${provider} API...`);
-    let enhancedProfileData: Record<string, any> = {};
+Historical Figure: ${profile.name}
+Known Information: ${profile.biography || 'No biography available'}
+Birth Year: ${profile.birthYear || 'Unknown'}
+Death Year: ${profile.deathYear || 'Unknown'}
+Nationality: ${profile.nationality || 'Unknown'}
+
+Please infer any missing details based on historical records and the time period. If certain information is not known with confidence, make educated guesses based on their era and social position.`;
+
+    let enhancedProfileData = {};
     
     try {
       if (provider === 'anthropic') {
         if (!process.env.ANTHROPIC_API_KEY) {
-          console.error(`[Profile Enrichment API] Missing ANTHROPIC_API_KEY environment variable`);
           throw new Error("Missing ANTHROPIC_API_KEY environment variable");
         }
         
@@ -101,8 +85,6 @@ Format your response as a JSON object with the following structure:
         const contentBlock = response.content[0];
         const content = contentBlock.type === 'text' ? contentBlock.text : '';
         
-        console.log(`[Profile Enrichment API] Received raw Anthropic response`);
-        
         const jsonStartIndex = content.indexOf('{');
         const jsonEndIndex = content.lastIndexOf('}') + 1;
         
@@ -110,21 +92,17 @@ Format your response as a JSON object with the following structure:
           const jsonString = content.substring(jsonStartIndex, jsonEndIndex);
           try {
             enhancedProfileData = JSON.parse(jsonString);
-            console.log(`[Profile Enrichment API] Successfully parsed JSON response from Anthropic`);
           } catch (jsonError) {
-            console.error(`[Profile Enrichment API] Failed to parse JSON from Anthropic:`, jsonError);
-            console.log(`[Profile Enrichment API] Raw JSON string: ${jsonString}`);
+            console.error(`[Profile Enrichment] Failed to parse Anthropic JSON:`, jsonError);
             throw new Error("Failed to parse Anthropic JSON response");
           }
         } else {
-          console.error(`[Profile Enrichment API] Could not find JSON in Anthropic response`);
-          console.log(`[Profile Enrichment API] Raw content: ${content.substring(0, 200)}...`);
+          console.error(`[Profile Enrichment] No JSON found in Anthropic response`);
           throw new Error("Could not find JSON in Anthropic response");
         }
       } else {
         // Default to OpenAI
         if (!process.env.OPENAI_API_KEY) {
-          console.error(`[Profile Enrichment API] Missing OPENAI_API_KEY environment variable`);
           throw new Error("Missing OPENAI_API_KEY environment variable");
         }
         
@@ -138,58 +116,39 @@ Format your response as a JSON object with the following structure:
         if (content) {
           try {
             enhancedProfileData = JSON.parse(content);
-            console.log(`[Profile Enrichment API] Successfully parsed JSON response from OpenAI`);
           } catch (jsonError) {
-            console.error(`[Profile Enrichment API] Failed to parse OpenAI JSON:`, jsonError);
-            console.log(`[Profile Enrichment API] Raw content from OpenAI: ${content.substring(0, 200)}...`);
+            console.error(`[Profile Enrichment] Failed to parse OpenAI JSON:`, jsonError);
             throw new Error("Failed to parse OpenAI JSON response");
           }
         } else {
-          console.error(`[Profile Enrichment API] Empty response from OpenAI`);
           throw new Error("Empty response from OpenAI");
         }
       }
     } catch (aiError) {
-      console.error(`[Profile Enrichment API] AI provider error:`, aiError);
+      console.error(`[Profile Enrichment] AI provider error:`, aiError);
       // Return partial data if available, otherwise re-throw
       if (Object.keys(enhancedProfileData).length === 0) {
         throw aiError;
-      } else {
-        console.log(`[Profile Enrichment API] Proceeding with partial data despite AI error`);
       }
     }
     
-    console.log(`[Profile Enrichment API] Enhanced data: ${JSON.stringify(enhancedProfileData)}`);
-    
-    // Merge the enhanced data with the original profile
+    // Create enriched profile by merging original with enhanced data
     const enrichedProfile = {
       ...profile,
-      gender: enhancedProfileData.gender || profile.gender || null,
-      age: enhancedProfileData.age || profile.age || null,
-      birthYear: enhancedProfileData.birthYear || profile.birthYear || null,
-      deathYear: enhancedProfileData.deathYear || profile.deathYear || null,
-      nationality: enhancedProfileData.nationality || profile.nationality || null,
-      nativeLanguage: enhancedProfileData.nativeLanguage || profile.nativeLanguage || null,
-      accent: enhancedProfileData.accent || profile.accent || null,
-      era: enhancedProfileData.era || profile.era || null,
-      voiceCharacteristics: enhancedProfileData.voiceCharacteristics || null,
-      speechPatterns: enhancedProfileData.speechPatterns || null,
+      ...enhancedProfileData
     };
     
-    console.log(`[Profile Enrichment API] Successfully enriched profile for ${profile.name}`);
+    console.log(`[Profile Enrichment] Successfully enriched profile for ${profile.name}`);
+    
     return NextResponse.json({
-      originalProfile: profile,
-      enrichedProfile: enrichedProfile,
+      enrichedProfile,
       enhancedData: enhancedProfileData
     });
     
   } catch (error) {
-    console.error(`[Profile Enrichment API] Error:`, error);
+    console.error(`[Profile Enrichment] Error:`, error);
     return NextResponse.json(
-      { 
-        error: 'Failed to enrich profile data',
-        message: error instanceof Error ? error.message : 'Unknown error'
-      },
+      { error: error instanceof Error ? error.message : 'Failed to enrich profile' },
       { status: 500 }
     );
   }

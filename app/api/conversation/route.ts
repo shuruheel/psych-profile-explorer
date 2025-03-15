@@ -251,6 +251,10 @@ export async function POST(request: Request) {
     // Prepare context with psychological profile and reasoning chains
     const context = prepareContext(profile, reasoningChains);
     
+    // Log the context being sent to the LLM
+    console.log(`[Conversation] Preparing response for ${profile.name} with ${reasoningChains.length} reasoning chains`);
+    console.log(`[Conversation] Full context being sent to ${model}:`, context);
+    
     // Generate response using selected language model
     let responseText;
     try {
@@ -260,7 +264,7 @@ export async function POST(request: Request) {
         responseText = await generateOpenAIResponse(context, userMessage, messageHistory);
       }
     } catch (error) {
-      console.error('Error generating response:', error);
+      console.error('[Conversation] Error generating response:', error);
       responseText = "I apologize, but I'm having trouble responding right now. Please try again later.";
     }
     
@@ -279,7 +283,7 @@ export async function POST(request: Request) {
       });
       
       if (!speechResponse.ok) {
-        console.error('Text-to-speech API error');
+        console.error('[Conversation] Text-to-speech API error');
         
         // Return just the text if speech generation fails
         return NextResponse.json({
@@ -293,7 +297,6 @@ export async function POST(request: Request) {
       // Update the profile with the voiceId if it was generated
       if (speechData.voiceId && !profile.voiceId) {
         profile.voiceId = speechData.voiceId;
-        console.log(`Voice ID ${speechData.voiceId} assigned to ${profile.name}`);
       }
       
       return NextResponse.json({
@@ -303,7 +306,7 @@ export async function POST(request: Request) {
         model
       });
     } catch (error) {
-      console.error('Error generating speech:', error);
+      console.error('[Conversation] Error generating speech:', error);
       
       // Return just the text if speech generation fails
       return NextResponse.json({
@@ -313,7 +316,7 @@ export async function POST(request: Request) {
     }
     
   } catch (error) {
-    console.error('Error in conversation endpoint:', error);
+    console.error('[Conversation] Error in conversation endpoint:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

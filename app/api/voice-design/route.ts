@@ -138,11 +138,8 @@ function generateExampleText(profile: Profile): string {
 // Function to enrich profile with LLM-generated biographical information
 async function enrichProfileWithBiographicalDetails(profile: Profile): Promise<Profile> {
   try {
-    console.log(`[Voice Design] Starting profile enrichment for ${profile.name}...`);
-    
     // Skip enrichment if we already have gender information
     if (profile.gender) {
-      console.log(`[Voice Design] Profile already has gender info, skipping enrichment`);
       return profile;
     }
     
@@ -150,7 +147,6 @@ async function enrichProfileWithBiographicalDetails(profile: Profile): Promise<P
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
                    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
     
-    console.log(`[Voice Design] Calling profile-enrichment API...`);
     const response = await fetch(`${baseUrl}/api/profile-enrichment`, {
       method: 'POST',
       headers: {
@@ -160,12 +156,11 @@ async function enrichProfileWithBiographicalDetails(profile: Profile): Promise<P
     });
     
     if (!response.ok) {
-      console.error(`[Voice Design] Failed to enrich profile: ${await response.text()}`);
+      console.error(`[Voice Design] Profile enrichment failed: ${await response.text()}`);
       return profile; // Return original profile if enrichment fails
     }
     
     const data = await response.json();
-    console.log(`[Voice Design] Successfully enriched profile with: ${JSON.stringify(data.enhancedData)}`);
     return data.enrichedProfile;
   } catch (error) {
     console.error(`[Voice Design] Error enriching profile:`, error);

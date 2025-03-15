@@ -257,7 +257,18 @@ export default function ProfileViewer() {
         throw new Error(`Failed to fetch profile: ${response.status}`)
       }
       
-      const profile = await response.json()
+      const data = await response.json()
+      
+      // Handle both old and new API response formats
+      // New format has { profile, reasoningChains } structure
+      const profile = data.profile || data
+      const reasoningChains = data.reasoningChains || []
+      
+      console.log(`Fetched profile for ${name} with ${reasoningChains.length} reasoning chains`)
+      
+      // Store the reasoning chains on the profile object for now
+      profile.reasoningChains = reasoningChains
+      
       setSelectedProfile(profile)
       
       // Add this profile to our cache

@@ -1,9 +1,4 @@
 {
-  "Konrad Adenauer": {
-    "voiceId": "nZxdHkH8ag2LJZLW2oBg",
-    "timestamp": "2025-03-13T23:56:02.967Z",
-    "profileName": "Konrad Adenauer"
-  },
   "Margaret Thatcher": {
     "voiceId": "y6Ns8N420qRBs5Nfl8QY",
     "timestamp": "2025-03-13T23:56:39.738Z",
@@ -13,5 +8,40 @@
     "voiceId": "yQiasm8mMXkCxuQSmUeO",
     "timestamp": "2025-03-13T23:58:05.075Z",
     "profileName": "Lee Kuan Yew"
+  },
+  "George W. Bush": {
+    "voiceId": "vSTblAS32qhdM5hoT0Hw",
+    "timestamp": "2025-03-14T22:10:09.273Z",
+    "profileName": "George W. Bush"
+  },
+  "Benazir Bhutto": {
+    "voiceId": "9QtSEGM8YfUJ96iTI9i2",
+    "timestamp": "2025-03-14T22:16:06.973Z",
+    "profileName": "Benazir Bhutto"
+  },
+  "Hamid Gul": {
+    "voiceId": "JueqmR6ZbrOybfbpnAFo",
+    "timestamp": "2025-03-14T22:22:36.190Z",
+    "profileName": "Hamid Gul"
+  },
+  "Seymour Benzer": {
+    "voiceId": "OxakTyvKSL2tK3DPeBlk",
+    "timestamp": "2025-03-14T22:27:38.061Z",
+    "profileName": "Seymour Benzer"
+  },
+  "Nawaz Sharif": {
+    "voiceId": "whXCv8nj8UtLAq6VS9Ti",
+    "timestamp": "2025-03-14T22:31:23.040Z",
+    "profileName": "Nawaz Sharif"
+  },
+  "Sigmund Freud": {
+    "voiceId": "17rCziQtON25Ld6cY9Nw",
+    "timestamp": "2025-03-14T22:36:10.152Z",
+    "profileName": "Sigmund Freud"
+  },
+  "Konrad Adenauer": {
+    "voiceId": "wHSz51Rs3w8XyZ5Gwb8W",
+    "timestamp": "2025-03-15T00:47:46.074Z",
+    "profileName": "Konrad Adenauer"
   }
 }

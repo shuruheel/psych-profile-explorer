@@ -1,10 +1,41 @@
 import { NextResponse } from 'next/server';
 import { Profile } from '@/types/profile';
 
+// Type for reasoning chain
+interface ReasoningChain {
+  name: string;
+  nodeType: string;
+  description: string;
+  conclusion: string;
+  confidenceScore: number;
+  creator: string;
+  methodology: string;
+  domain: string;
+  numberOfSteps: number;
+  alternativeConclusionsConsidered: string[];
+  reasoningSteps?: ReasoningStep[];
+}
+
+// Type for reasoning step
+interface ReasoningStep {
+  name: string;
+  nodeType: string;
+  content: string;
+  stepType: string;
+  evidenceType: string;
+  supportingReferences: string[];
+  confidence: number;
+  alternatives: string[];
+  counterarguments: string[];
+  assumptions: string[];
+  formalNotation: string;
+  order: number;
+}
+
 // Prepare the psychological profile context for the conversation
-function prepareContext(profile: Profile): string {
+function prepareContext(profile: Profile, reasoningChains: ReasoningChain[] = []): string {
   // Build a comprehensive context from the profile data
-  return `
+  let context = `
 You are ${profile.name}, a historical figure with the following psychological profile:
 
 ## Biographical Information
@@ -38,7 +69,39 @@ ${profile.personalityTraits.map(trait => `- ${trait.trait} (Confidence: ${trait.
 - Core Values: ${profile.valueSystem.coreValues.map(value => 
   `${value.value} (Importance: ${value.importance * 100}%, Consistency: ${value.consistency * 100}%)`).join(', ')}
 - Ethical Framework: ${profile.valueSystem.ethicalFramework}
+`;
 
+  // Add reasoning chains if they exist
+  if (reasoningChains.length > 0) {
+    context += `
+## Reasoning Chain Examples
+${reasoningChains.map(chain => `
+### ${chain.name}
+- Description: ${chain.description}
+- Conclusion: ${chain.conclusion}
+- Confidence: ${chain.confidenceScore * 100}%
+- Methodology: ${chain.methodology}
+- Domain: ${chain.domain}
+- Number of Steps: ${chain.numberOfSteps}
+- Alternative Conclusions Considered: ${chain.alternativeConclusionsConsidered.join(', ')}
+
+${chain.reasoningSteps && chain.reasoningSteps.length > 0 ? `#### Reasoning Steps
+${chain.reasoningSteps.sort((a, b) => a.order - b.order).map(step => `
+##### Step ${step.order}: ${step.name} (${step.stepType})
+- Content: ${step.content}
+- Evidence Type: ${step.evidenceType}
+- Supporting References: ${step.supportingReferences.join(', ')}
+- Confidence: ${step.confidence * 100}%
+- Assumptions: ${step.assumptions.join(', ')}
+${step.alternatives.length > 0 ? `- Alternative Perspectives: ${step.alternatives.join(', ')}` : ''}
+${step.counterarguments.length > 0 ? `- Counterarguments: ${step.counterarguments.join(', ')}` : ''}
+`).join('\n')}` : ''}
+`).join('\n')}
+`;
+  }
+
+  // Add roleplaying instructions
+  context += `
 ## Roleplaying Instructions
 
 You are now embodying ${profile.name}. Your responses should authentically reflect this historical figure in every way. Follow these guidelines:
@@ -65,6 +128,7 @@ You are now embodying ${profile.name}. Your responses should authentically refle
 - If you were known for specific phrases, speech habits, or linguistic quirks, incorporate these naturally
 - Your interpersonal style is described as "${profile.relationalDynamics?.interpersonalStyle || 'not specified'}" - communicate accordingly
 - Apply your negotiation tactics (${profile.relationalDynamics?.powerDynamics?.negotiationTactics?.join(', ') || 'your typical approach'}) when discussing or debating
+- Incorporate ("${profile.speechPatterns || 'your idiosyncratic speech patterns'}") into your responses
 
 ### 5. Values and Beliefs
 - Strongly advocate for your core values: ${profile.valueSystem?.coreValues?.map(v => v.value).join(', ') || 'your documented values'}
@@ -82,10 +146,16 @@ You are now embodying ${profile.name}. Your responses should authentically refle
 - Use appropriate pauses, emphasis, and rhythms that would sound natural in speech
 - Avoid overly complex sentence structures that would be difficult to follow in spoken format
 - Use contractions, casual transitions, and other elements of natural speech where appropriate for your character
-- If your historical figure had a distinctive way of speaking (pace, volume, emphasis patterns), incorporate these attributes
+
+### 8. Reasoning Patterns
+${reasoningChains.length > 0 ? `- When faced with decisions or questions requiring reasoning, use your past reasoning chains as examples of how to reason
+- When analyzing complex topics, break down your reasoning into distinct steps as shown in the examples` 
+: '- Apply your established reasoning patterns when analyzing situations or making judgments'}
 
 The user is speaking to you from the present day, but you respond as if you are truly ${profile.name}, with your authentic perspectives, knowledge, emotions, and speech patterns. You are not roleplaying or pretending - for the purpose of this conversation, you ARE ${profile.name}.
 `;
+
+  return context;
 }
 
 // Function to generate responses using OpenAI
@@ -105,10 +175,9 @@ async function generateOpenAIResponse(context: string, userMessage: string, mess
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4-turbo',
+        model: 'o3-mini-2025-01-31',
         messages,
-        temperature: 0.7,
-        max_tokens: 500,
+        max_completion_tokens: 3000,
       }),
     });
     
@@ -146,7 +215,7 @@ async function generateAnthropicResponse(context: string, userMessage: string, m
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'claude-3-opus-20240229',
+        model: 'claude-3-5-sonnet-20240620',
         system: context,
         messages,
         max_tokens: 500,
@@ -170,7 +239,7 @@ async function generateAnthropicResponse(context: string, userMessage: string, m
 
 export async function POST(request: Request) {
   try {
-    const { profile, userMessage, messageHistory, model = 'openai' } = await request.json();
+    const { profile, reasoningChains = [], userMessage, messageHistory, model = 'openai' } = await request.json();
     
     if (!profile || !userMessage) {
       return NextResponse.json(
@@ -179,8 +248,8 @@ export async function POST(request: Request) {
       );
     }
     
-    // Prepare context with psychological profile
-    const context = prepareContext(profile);
+    // Prepare context with psychological profile and reasoning chains
+    const context = prepareContext(profile, reasoningChains);
     
     // Generate response using selected language model
     let responseText;

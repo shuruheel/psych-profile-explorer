@@ -92,7 +92,7 @@ Format your response as a JSON object with the following structure:
         }
         
         const response = await anthropic.messages.create({
-          model: 'claude-3-sonnet-20240229',
+          model: 'claude-3-5-sonnet-20240620',
           max_tokens: 1000,
           messages: [{ role: 'user', content: prompt }],
         });
@@ -129,7 +129,7 @@ Format your response as a JSON object with the following structure:
         }
         
         const response = await openai.chat.completions.create({
-          model: 'gpt-4o',
+          model: 'o3-mini-2025-01-31',
           messages: [{ role: 'user', content: prompt }],
           response_format: { type: 'json_object' },
         });

@@ -170,39 +170,31 @@ async function enrichProfileWithBiographicalDetails(profile: Profile): Promise<P
 
 export async function POST(request: Request) {
   try {
-    console.log(`[Voice Design API] Request received`);
     const { profile } = await request.json();
     
     if (!profile || !profile.name) {
-      console.log(`[Voice Design API] Invalid profile data`);
       return NextResponse.json(
         { error: 'Missing profile data' },
         { status: 400 }
       );
     }
     
-    console.log(`[Voice Design API] Processing request for ${profile.name}`);
-    
     // Check if we already have a generated voice ID for this profile
     if (voiceCache[profile.name]) {
-      console.log(`[Voice Design API] Using cached voice ID for ${profile.name}: ${voiceCache[profile.name]}`);
       return NextResponse.json({
         voiceId: voiceCache[profile.name],
         cached: true
       });
     }
     
-    console.log(`[Voice Design API] No cached voice found, enriching profile...`);
     const enrichedProfile = await enrichProfileWithBiographicalDetails(profile);
     
     // Create voice description from enriched profile
     const voiceDescription = createVoiceDescription(enrichedProfile);
-    console.log(`[Voice Design API] Created voice description: ${voiceDescription.substring(0, 100)}...`);
     
     // Generate example text for the voice preview
     const exampleText = generateExampleText(enrichedProfile);
     
-    console.log(`[Voice Design API] Calling Eleven Labs Voice Design API...`);
     // Call Eleven Labs Voice Design API using the latest endpoint
     const response = await fetch(
       'https://api.elevenlabs.io/v1/text-to-voice/create-previews',
@@ -232,7 +224,6 @@ export async function POST(request: Request) {
     }
     
     const voiceData = await response.json();
-    console.log(`[Voice Design API] Received voice previews: ${voiceData.previews?.length || 0}`);
     
     // Choose the first preview (we could add logic to let the user select from options in a real app)
     if (!voiceData.previews || voiceData.previews.length === 0) {
@@ -245,9 +236,7 @@ export async function POST(request: Request) {
     }
     
     const generatedVoiceId = voiceData.previews[0].generated_voice_id;
-    console.log(`[Voice Design API] Generated voice ID: ${generatedVoiceId}`);
     
-    console.log(`[Voice Design API] Saving voice to make it permanent...`);
     // Save the voice to make it permanent
     const saveResponse = await fetch(
       'https://api.elevenlabs.io/v1/text-to-voice/create-voice-from-preview',
@@ -286,7 +275,6 @@ export async function POST(request: Request) {
     
     // Store the permanent voice ID in our cache
     voiceCache[profile.name] = permanentVoiceId;
-    console.log(`[Voice Design API] Voice successfully generated and saved for ${profile.name} with ID: ${permanentVoiceId}`);
     
     return NextResponse.json({
       voiceId: permanentVoiceId

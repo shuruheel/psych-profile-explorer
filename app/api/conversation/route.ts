@@ -28,12 +28,12 @@ interface ReasoningStep {
   alternatives: string[];
   counterarguments: string[];
   assumptions: string[];
-  formalNotation: string;
   order: number;
 }
 
 // Prepare the psychological profile context for the conversation
 function prepareContext(profile: Profile, reasoningChains: ReasoningChain[] = []): string {
+  console.log(`[Conversation] Processing ${reasoningChains.length} reasoning chains`);
   // Build a comprehensive context from the profile data
   let context = `
 You are ${profile.name}, a historical figure with the following psychological profile:
@@ -251,10 +251,6 @@ export async function POST(request: Request) {
     // Prepare context with psychological profile and reasoning chains
     const context = prepareContext(profile, reasoningChains);
     
-    // Log the context being sent to the LLM
-    console.log(`[Conversation] Preparing response for ${profile.name} with ${reasoningChains.length} reasoning chains`);
-    console.log(`[Conversation] Full context being sent to ${model}:`, context);
-    
     // Generate response using selected language model
     let responseText;
     try {
@@ -314,7 +310,6 @@ export async function POST(request: Request) {
         model
       });
     }
-    
   } catch (error) {
     console.error('[Conversation] Error in conversation endpoint:', error);
     return NextResponse.json(

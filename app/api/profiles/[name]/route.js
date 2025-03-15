@@ -7,16 +7,12 @@ export async function GET(request, context) {
   const { name } = params;
   
   try {
-    console.log(`API route: Fetching profile for ${name}`);
     const decodedName = decodeURIComponent(name);
     const profile = await getProfileByName(decodedName);
     
     if (!profile) {
-      console.log(`API route: Profile not found for ${decodedName}`);
       return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
     }
-    
-    console.log(`API route: Profile found for ${decodedName}, fetching reasoning chains`);
     
     try {
       // Fetch related reasoning chains

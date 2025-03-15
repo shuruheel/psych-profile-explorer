@@ -20,7 +20,6 @@ try {
   Object.entries(fileCache).forEach(([profileName, entry]) => {
     inMemoryCache[profileName] = entry.voiceId;
   });
-  console.log(`[VoiceCache] Loaded ${Object.keys(inMemoryCache).length} voice IDs from file cache`);
 } catch (error) {
   console.error('[VoiceCache] Error loading from file cache:', error);
 }

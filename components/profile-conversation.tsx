@@ -15,8 +15,28 @@ interface ProfileConversationProps {
 export function ProfileConversation({ profile }: ProfileConversationProps) {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [showLoadingSpinner, setShowLoadingSpinner] = useState(false)
+  const [reasoningChains, setReasoningChains] = useState([])
   const { voiceStatus, voiceId, startVoiceGeneration, isGeneratingVoice } = useVoiceGeneration(profile)
   const profileNameRef = useRef<string | null>(null)
+  
+  // Fetch reasoning chains when profile changes
+  useEffect(() => {
+    const fetchReasoningChains = async () => {
+      if (!profile?.name) return;
+      
+      try {
+        const response = await fetch(`/api/reasoning-chains?name=${encodeURIComponent(profile.name)}`);
+        if (response.ok) {
+          const data = await response.json();
+          setReasoningChains(data);
+        }
+      } catch (error) {
+        console.error('Error fetching reasoning chains:', error);
+      }
+    };
+    
+    fetchReasoningChains();
+  }, [profile?.name]);
   
   // Start voice generation when profile is loaded or changes
   useEffect(() => {
@@ -105,6 +125,7 @@ export function ProfileConversation({ profile }: ProfileConversationProps) {
         onOpenChange={handleDialogOpenChange}
         profile={profile}
         voiceId={voiceId}
+        reasoningChains={reasoningChains}
       />
     </>
   )

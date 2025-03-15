@@ -22,13 +22,15 @@ interface ConversationDialogProps {
   onOpenChange: (open: boolean) => void
   profile: Profile | null
   voiceId: string | null
+  reasoningChains?: any[]
 }
 
 export function ConversationDialog({ 
   open, 
   onOpenChange, 
   profile,
-  voiceId 
+  voiceId,
+  reasoningChains = []
 }: ConversationDialogProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
@@ -101,6 +103,7 @@ export function ConversationDialog({
             ...profile,
             voiceId // Add voiceId to profile
           },
+          reasoningChains, // Add reasoningChains to request
           userMessage,
           messageHistory: messages.map(m => ({ role: m.role, content: m.content })),
           model: selectedModel
